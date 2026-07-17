@@ -1,0 +1,11 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import DashboardClient from "@/components/DashboardClient";
+---
+
+<Layout
+  title="Dashboard"
+  description="SeenTube Dashboard — your shared YouTube collection"
+>
+  <DashboardClient client:load />
+</Layout>

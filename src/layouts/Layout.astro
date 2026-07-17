@@ -1,0 +1,88 @@
+---
+import "@/styles/globals.css";
+import Navbar, { BottomNav } from "@/components/Navbar";
+import { Toaster } from "sonner";
+import { ClientRouter } from "astro:transitions";
+
+interface Props {
+  title?: string;
+  description?: string;
+  showNav?: boolean;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    image?: string | null;
+  } | null;
+}
+
+const {
+  title = "SeenTube",
+  description = "Your shared YouTube collection",
+  showNav = true,
+  user = null,
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} — SeenTube</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <ClientRouter />
+    <script is:inline>
+      window.addEventListener("vite:preloadError", (event) => {
+        event.preventDefault();
+        const key = "seentube:vite-preload-reload";
+        const lastReload = Number(sessionStorage.getItem(key) || 0);
+        if (Date.now() - lastReload < 10000) return;
+        sessionStorage.setItem(key, String(Date.now()));
+        window.location.reload();
+      });
+    </script>
+  </head>
+  <body class="min-h-screen bg-background text-foreground antialiased">
+    {
+      showNav && (
+        <Navbar
+          client:load
+          transition:persist="navbar"
+        />
+      )
+    }
+    <main class={showNav ? "pt-20 pb-20 lg:pb-0" : ""}>
+      <slot />
+    </main>
+    {
+      showNav && (
+        <BottomNav
+          client:load
+          transition:persist="bottom-nav"
+        />
+      )
+    }
+    <Toaster
+      client:load
+      transition:persist="toaster"
+      position="bottom-right"
+      theme="light"
+      expand
+      toastOptions={{
+        classNames: {
+          toast: "!rounded-lg !border !border-border !bg-white !shadow-none !font-sans !text-sm",
+          title: "!text-foreground !font-medium",
+          description: "!text-muted-foreground",
+          success: "!border-border [&_[data-icon]]:!text-primary",
+          error: "!border-[hsl(11,81%,90%)] !bg-[hsl(11,81%,97%)] [&_[data-icon]]:!text-destructive",
+          closeButton: "!bg-white !border-border !text-foreground",
+        },
+      }}
+    />
+  </body>
+</html>

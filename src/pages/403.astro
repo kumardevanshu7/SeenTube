@@ -1,0 +1,28 @@
+---
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="Access Denied" showNav={false}>
+  <div class="min-h-screen flex items-center justify-center px-4">
+    <div class="text-center max-w-md animate-fade-in">
+      <div class="w-20 h-20 rounded-full bg-secondary border border-border flex items-center justify-center mx-auto mb-6">
+        <svg class="w-10 h-10 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        </svg>
+      </div>
+      <h1 class="font-display text-3xl font-bold text-foreground mb-3">Access Denied</h1>
+      <p class="text-muted-foreground mb-2">
+        This app is private and only accessible to authorized accounts.
+      </p>
+      <p class="text-sm text-muted-foreground mb-8">
+        Your Google account is not on the allowed list.
+      </p>
+      <a
+        href="/login"
+        class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-[#e00b41] active:scale-95 transition-all"
+      >
+        Try a different account
+      </a>
+    </div>
+  </div>
+</Layout>

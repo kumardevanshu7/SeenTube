@@ -1,0 +1,12 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import UsernameOnboarding from "@/components/UsernameOnboarding";
+---
+
+<Layout
+  title="Choose your username"
+  description="Set your public SeenTube username"
+  showNav={false}
+>
+  <UsernameOnboarding client:load />
+</Layout>

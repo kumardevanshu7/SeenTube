@@ -1,0 +1,11 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import VideosClient from "@/components/VideosClient";
+---
+
+<Layout
+  title="Collection"
+  description="Your shared YouTube video collection"
+>
+  <VideosClient client:load />
+</Layout>

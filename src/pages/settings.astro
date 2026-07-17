@@ -1,0 +1,11 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import DeletionSecuritySettings from "@/components/DeletionSecuritySettings";
+---
+
+<Layout
+  title="Settings"
+  description="Manage your SeenTube deletion security"
+>
+  <DeletionSecuritySettings client:load />
+</Layout>

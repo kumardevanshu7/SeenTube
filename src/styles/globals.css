@@ -1,0 +1,322 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&display=swap");
+@import "tailwindcss";
+
+/* ────────────────────────────────────────────────────────────
+   SeenTube — Airbnb-inspired design tokens
+   Single accent color (Rausch), white canvas, soft rounding,
+   one shadow tier. No dark mode, no gradients, no blur.
+   ──────────────────────────────────────────────────────────── */
+:root {
+  /* Surface */
+  --background: 0 0% 100%;            /* #FFFFFF — canvas */
+  --foreground: 0 0% 13%;             /* #222222 — ink */
+
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 13%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 13%;
+
+  /* Brand */
+  --primary: 349 100% 61%;            /* #FF385C — Rausch */
+  --primary-active: 342 96% 45%;      /* #E00B41 — press state */
+  --primary-disabled: 342 100% 91%;   /* #FFD1DA — disabled tint */
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 0 0% 97%;              /* #F7F7F7 — surface soft */
+  --secondary-foreground: 0 0% 13%;
+
+  --muted: 0 0% 95%;                  /* #F2F2F2 — surface strong */
+  --muted-foreground: 0 0% 42%;       /* #6A6A6A */
+
+  --accent: 0 0% 97%;
+  --accent-foreground: 0 0% 13%;
+
+  --destructive: 11 81% 38%;          /* #C13515 — error text */
+  --destructive-foreground: 0 0% 100%;
+
+  /* Hairlines */
+  --border: 0 0% 87%;                 /* #DDDDDD — hairline */
+  --border-soft: 0 0% 92%;            /* #EBEBEB */
+  --border-strong: 0 0% 76%;          /* #C1C1C1 */
+  --input: 0 0% 76%;
+  --ring: 0 0% 13%;
+
+  /* Radius — buttons 8px, cards 14px, category strip 32px, pills full */
+  --radius: 14px;
+  --radius-button: 8px;
+  --radius-card: 14px;
+  --radius-strip: 32px;
+
+  /* Status — badge tones (used on the small pill badges) */
+  --status-pending-bg: 0 0% 97%;
+  --status-pending-text: 0 0% 42%;
+  --status-pending-border: 0 0% 87%;
+
+  --status-partial-bg: 348 100% 97%;
+  --status-partial-text: 345 91% 46%;
+  --status-partial-border: 349 100% 90%;
+
+  --status-watched-bg: 0 0% 13%;
+  --status-watched-text: 0 0% 100%;
+  --status-watched-border: 0 0% 13%;
+
+  /* Status — light card tints (used on the video card surface itself) */
+  --card-tint-pending-bg: 48 100% 96%;      /* soft yellow */
+  --card-tint-pending-border: 45 93% 82%;
+
+  --card-tint-partial-bg: 348 100% 97%;     /* soft pink */
+  --card-tint-partial-border: 349 100% 90%;
+
+  --card-tint-watched-bg: 141 65% 96%;      /* soft green */
+  --card-tint-watched-border: 141 55% 82%;
+}
+
+/* ── Tailwind 4 theme mapping ─────────────────────────────── */
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* rounded-sm = button (8px), rounded-md/lg = card (14px), rounded-xl = category strip (32px) */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 14px;
+  --radius-xl: 32px;
+
+  --font-sans: "Inter", -apple-system, system-ui, "Helvetica Neue", sans-serif;
+  --font-display: "Inter", -apple-system, system-ui, "Helvetica Neue", sans-serif;
+}
+
+/* ── Base ─────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  border-color: hsl(var(--border));
+}
+
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: #ffffff;
+  min-height: 100vh;
+  color: hsl(var(--foreground));
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-display,
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: hsl(var(--foreground));
+}
+
+h1 { font-weight: 700; }
+h2, h3, h4, h5, h6 { font-weight: 600; }
+
+/* ── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); }
+
+/* ── Elevation — the system's single shadow tier ─────────── */
+.elevation-1 {
+  box-shadow:
+    rgba(0, 0, 0, 0.02) 0 0 0 1px,
+    rgba(0, 0, 0, 0.04) 0 2px 6px 0,
+    rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+}
+
+/* ── Card — main design primitive (flat by default, single shadow on hover) */
+.card,
+.card-flat,
+.glass-card {
+  background: #ffffff;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-card);
+  box-shadow: none;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.card:hover,
+.glass-card:hover {
+  border-color: hsl(var(--border));
+  box-shadow:
+    rgba(0, 0, 0, 0.02) 0 0 0 1px,
+    rgba(0, 0, 0, 0.04) 0 2px 6px 0,
+    rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+}
+
+/* ── Card status tints — light background per watch status ── */
+.card-tint-pending {
+  background: hsl(var(--card-tint-pending-bg));
+  border-color: hsl(var(--card-tint-pending-border));
+}
+.card-tint-partially_watched {
+  background: hsl(var(--card-tint-partial-bg));
+  border-color: hsl(var(--card-tint-partial-border));
+}
+.card-tint-watched {
+  background: hsl(var(--card-tint-watched-bg));
+  border-color: hsl(var(--card-tint-watched-border));
+}
+
+/* ── Sidebar (footer link columns reuse this) ────────────── */
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-button);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  transition: background 0.15s ease, color 0.15s ease;
+  text-decoration: none;
+}
+.sidebar-link:hover {
+  background: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+}
+.sidebar-link.active {
+  background: hsl(var(--foreground));
+  color: #ffffff;
+}
+
+/* ── Status badges ────────────────────────────────────────── */
+.badge-pending {
+  background: hsl(var(--status-pending-bg));
+  border: 1px solid hsl(var(--status-pending-border));
+  color: hsl(var(--status-pending-text));
+}
+.badge-partially {
+  background: hsl(var(--status-partial-bg));
+  border: 1px solid hsl(var(--status-partial-border));
+  color: hsl(var(--status-partial-text));
+}
+.badge-watched {
+  background: hsl(var(--status-watched-bg));
+  border: 1px solid hsl(var(--status-watched-border));
+  color: hsl(var(--status-watched-text));
+}
+
+/* ── Category pill — single neutral style, no rainbow coding */
+.category-pill {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.625rem;
+  border-radius: 999px;
+  background: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+}
+
+/* ── Brand text — Rausch, no gradient (single accent color rule) */
+.gradient-text {
+  color: #ff385c;
+}
+
+/* ── Animations ───────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in   { animation: fade-in 0.4s ease-out forwards; }
+.animate-slide-in  { animation: slide-in-left 0.35s ease-out forwards; }
+.animate-scale-in  { animation: scale-in 0.25s ease-out forwards; }
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--border)) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite;
+}
+
+/* ── Focus — strong 2px ink outline, no glow/ring ─────────── */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+input,
+textarea,
+button,
+[role="combobox"] { font-family: inherit; }
+
+input:focus-visible,
+textarea:focus-visible,
+[role="combobox"]:focus-visible {
+  outline: 2px solid #222222;
+  outline-offset: -1px;
+  box-shadow: none;
+}
+
+/* ── Selection ────────────────────────────────────────────── */
+::selection {
+  background: rgba(255, 56, 92, 0.18);
+  color: #222222;
+}
+
+/* ── Buttons — Rausch fill, 8px radius, flat (no shadow) ──── */
+button.bg-primary,
+a.bg-primary {
+  border-radius: var(--radius-button);
+  box-shadow: none;
+}
+button.bg-primary:active,
+a.bg-primary:active { background: hsl(var(--primary-active)); }
+
+/* ── Popovers / dropdowns — single elevation tier, no blur ── */
+[data-radix-popper-content-wrapper] > div {
+  background: #ffffff;
+  border-color: hsl(var(--border));
+  backdrop-filter: none;
+  box-shadow:
+    rgba(0, 0, 0, 0.02) 0 0 0 1px,
+    rgba(0, 0, 0, 0.04) 0 2px 6px 0,
+    rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+}

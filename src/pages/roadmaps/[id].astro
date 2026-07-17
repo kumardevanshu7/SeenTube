@@ -1,0 +1,13 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import RoadmapDetailClient from "@/components/RoadmapDetailClient";
+
+const roadmapId = Astro.params.id || "";
+---
+
+<Layout
+  title="Roadmap"
+  description="Follow an ordered YouTube learning roadmap"
+>
+  <RoadmapDetailClient roadmapId={roadmapId} client:load />
+</Layout>
