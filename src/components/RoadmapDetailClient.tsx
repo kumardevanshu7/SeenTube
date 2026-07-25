@@ -34,7 +34,6 @@ import {
 } from "@/lib/roadmaps";
 import RoadmapStepList from "@/components/RoadmapStepList";
 import DeletePasswordDialog from "@/components/DeletePasswordDialog";
-import BrandLoader from "@/components/BrandLoader";
 import { Button } from "@/components/ui/button";
 
 type DetailState = "loading" | "ready" | "not-found" | "forbidden" | "error";
@@ -249,7 +248,14 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
   };
 
   if (state === "loading") {
-    return <BrandLoader label="Loading roadmap…" />;
+    return (
+      <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6">
+        <div className="h-5 w-32 animate-shimmer rounded-md" />
+        <div className="h-12 w-3/4 animate-shimmer rounded-md" />
+        <div className="h-24 animate-shimmer rounded-lg" />
+        {[0, 1, 2].map((item) => <div key={item} className="h-40 animate-shimmer rounded-lg" />)}
+      </div>
+    );
   }
 
   if (state !== "ready" || !user || !roadmap) {

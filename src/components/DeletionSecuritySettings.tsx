@@ -3,7 +3,6 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { HelpCircle, KeyRound, Loader2, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { auth } from "@/lib/firebase";
-import BrandLoader from "@/components/BrandLoader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -115,7 +114,12 @@ export default function DeletionSecuritySettings() {
   };
 
   if (mode === "loading") {
-    return <BrandLoader label="Loading settings…" />;
+    return (
+      <div className="mx-auto max-w-3xl space-y-5 px-4 py-8 sm:px-6">
+        <div className="h-10 w-56 animate-shimmer rounded-md" />
+        <div className="h-64 animate-shimmer rounded-xl" />
+      </div>
+    );
   }
 
   if (mode === "configuration") {

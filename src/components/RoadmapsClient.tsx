@@ -36,7 +36,6 @@ import {
   type Visibility,
 } from "@/lib/roadmaps";
 import RoadmapStepList from "@/components/RoadmapStepList";
-import BrandLoader from "@/components/BrandLoader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -373,7 +372,15 @@ export default function RoadmapsClient() {
   };
 
   if (loading) {
-    return <BrandLoader label="Loading roadmaps…" />;
+    return (
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
+        <div className="h-10 w-64 animate-shimmer rounded-md" />
+        <div className="h-5 w-80 max-w-full animate-shimmer rounded-md" />
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map((item) => <div key={item} className="h-80 animate-shimmer rounded-lg" />)}
+        </div>
+      </div>
+    );
   }
 
   if (!user) return null;

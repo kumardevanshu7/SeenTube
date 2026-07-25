@@ -7,7 +7,6 @@ import { formatRelativeDate } from "@/lib/utils";
 import type { Video, VideoStatus } from "@/lib/constants";
 import { getCached, setCached } from "@/lib/data-cache";
 import { getUserProfile } from "@/lib/users";
-import BrandLoader from "./BrandLoader";
 
 const cacheKey = (uid: string) => `dashboard:data:${uid}`;
 
@@ -76,7 +75,39 @@ export default function DashboardClient() {
   };
 
   if (loading) {
-    return <BrandLoader label="Loading your dashboard…" />;
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-10">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="space-y-2">
+            <div className="h-9 w-72 rounded-md animate-shimmer" />
+            <div className="h-4 w-48 rounded-md animate-shimmer" />
+          </div>
+          <div className="h-12 w-32 rounded-lg animate-shimmer" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-lg border border-border p-5 space-y-3">
+              <div className="w-10 h-10 rounded-lg animate-shimmer" />
+              <div className="h-8 w-12 rounded-md animate-shimmer" />
+              <div className="h-4 w-20 rounded-md animate-shimmer" />
+            </div>
+          ))}
+        </div>
+        <div className="space-y-3">
+          <div className="h-6 w-36 rounded-md animate-shimmer" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-lg border border-border p-4 flex items-center gap-4">
+              <div className="w-20 h-14 rounded-lg animate-shimmer shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-3/4 rounded-md animate-shimmer" />
+                <div className="h-3 w-1/3 rounded-md animate-shimmer" />
+              </div>
+              <div className="h-6 w-20 rounded-full animate-shimmer shrink-0" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (!user) return null;
