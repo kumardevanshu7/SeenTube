@@ -6,6 +6,7 @@ import VideoGrid from "./VideoGrid";
 import type { VideoCardData } from "./VideoCard";
 import { getCached, setCached } from "@/lib/data-cache";
 import { getUserProfile } from "@/lib/users";
+import BrandLoader from "./BrandLoader";
 
 const cacheKey = (uid: string) => `videos:list:${uid}`;
 
@@ -90,30 +91,7 @@ export default function VideosClient() {
   };
 
   if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="space-y-2">
-            <div className="h-8 w-56 rounded-md animate-shimmer" />
-            <div className="h-4 w-40 rounded-md animate-shimmer" />
-          </div>
-          <div className="h-12 w-32 rounded-lg animate-shimmer" />
-        </div>
-        <div className="h-14 rounded-full animate-shimmer" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="rounded-lg border border-border overflow-hidden">
-              <div className="aspect-video animate-shimmer" />
-              <div className="p-4 space-y-3">
-                <div className="h-4 w-16 rounded-full animate-shimmer" />
-                <div className="h-4 w-full rounded-md animate-shimmer" />
-                <div className="h-4 w-2/3 rounded-md animate-shimmer" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <BrandLoader label="Loading your collection…" />;
   }
 
   if (!user) return null;

@@ -41,6 +41,7 @@ import {
   type Connection,
 } from "@/lib/connections";
 import { normalizeUsername } from "@/lib/users";
+import BrandLoader from "@/components/BrandLoader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -661,21 +662,7 @@ export default function GuildVideosClient() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto max-w-7xl space-y-7 px-4 py-8 sm:px-6">
-        <div className="space-y-2">
-          <div className="h-9 w-64 animate-shimmer rounded-md" />
-          <div className="h-5 w-96 max-w-full animate-shimmer rounded-md" />
-        </div>
-        <div className="h-52 animate-shimmer rounded-lg" />
-        <div className="h-12 animate-shimmer rounded-lg" />
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2, 3, 4, 5].map((item) => (
-            <div key={item} className="h-80 animate-shimmer rounded-lg" />
-          ))}
-        </div>
-      </div>
-    );
+    return <BrandLoader label="Loading guild videos…" />;
   }
 
   if (!user) return null;

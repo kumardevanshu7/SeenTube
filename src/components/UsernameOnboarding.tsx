@@ -148,9 +148,7 @@ export default function UsernameOnboarding() {
       <div className="relative mx-auto max-w-lg">
         <header className="mb-8 flex items-center justify-between">
           <a href="/" className="flex items-center gap-2 font-bold tracking-tight" aria-label="SeenTube home">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#ff385c] text-white shadow-sm">
-              <svg className="ml-0.5 h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
-            </span>
+            <img src="/icons/icon-192.png" alt="" aria-hidden="true" className="h-9 w-9 rounded-xl object-contain" />
             SeenTube
           </a>
           <button type="button" onClick={handleSignOut} disabled={submitting} className="rounded-lg px-3 py-2 text-sm font-semibold text-neutral-500 transition hover:bg-neutral-100 hover:text-[#171717] disabled:cursor-not-allowed disabled:opacity-50">

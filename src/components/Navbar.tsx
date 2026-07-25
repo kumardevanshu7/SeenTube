@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import {
-  Youtube,
   LayoutDashboard,
   Library,
   Plus,
@@ -118,9 +117,11 @@ export default function Navbar() {
           href="/dashboard"
           className="flex items-center gap-2.5 font-display font-bold text-xl group"
         >
-          <div className="w-8 h-8 rounded-lg bg-secondary border border-border flex items-center justify-center group-hover:border-primary/30 transition-colors">
-            <Youtube className="w-4 h-4 text-primary" />
-          </div>
+          <img
+            src="/icons/icon-192.png"
+            alt="SeenTube"
+            className="h-9 w-9 rounded-lg object-contain transition-transform group-hover:scale-105"
+          />
           <span className="gradient-text">SeenTube</span>
         </a>
 
