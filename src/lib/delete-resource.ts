@@ -3,11 +3,41 @@ import { auth } from "@/lib/firebase";
 export type ProtectedResourceType = "roadmap" | "video";
 
 type DeleteResponse = { error?: string };
+type SecurityResponse = {
+  configured?: boolean;
+  serverConfigured?: boolean;
+  securityQuestion?: string;
+  error?: string;
+};
+
+export type DeletionQuestion = {
+  configured: boolean;
+  serverConfigured: boolean;
+  securityQuestion: string;
+};
+
+export async function getDeletionQuestion(): Promise<DeletionQuestion> {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Please sign in again.");
+
+  const token = await user.getIdToken();
+  const response = await fetch("/api/deletion-security", {
+    method: "GET",
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  const result = await response.json().catch(() => ({})) as SecurityResponse;
+  if (!response.ok) throw new Error(result.error || "Could not load your security question.");
+  return {
+    configured: Boolean(result.configured),
+    serverConfigured: result.serverConfigured !== false,
+    securityQuestion: result.securityQuestion || "",
+  };
+}
 
 export async function deleteProtectedResource(
   resourceType: ProtectedResourceType,
   resourceId: string,
-  password: string,
+  answer: string,
 ) {
   const user = auth.currentUser;
   if (!user) throw new Error("Please sign in again before deleting.");
@@ -19,7 +49,7 @@ export async function deleteProtectedResource(
       "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ resourceType, resourceId, password }),
+    body: JSON.stringify({ resourceType, resourceId, answer }),
   });
   const result = await response.json().catch(() => ({})) as DeleteResponse;
   if (!response.ok) {

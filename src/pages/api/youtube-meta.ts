@@ -1,62 +1,44 @@
 import type { APIRoute } from "astro";
 
+const json = (status: number, body: Record<string, unknown>) => new Response(
+  JSON.stringify(body),
+  {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
+  },
+);
+
 export const GET: APIRoute = async ({ request }) => {
   const url = new URL(request.url).searchParams.get("url");
-
-  if (!url) {
-    return new Response(JSON.stringify({ error: "URL is required" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  if (!url) return json(400, { error: "URL is required" });
 
   try {
-    // Basic YouTube URL validation and ID extraction
     const videoIdMatch = url.match(
-      /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+      /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
     );
     const videoId = videoIdMatch ? videoIdMatch[1] : null;
+    if (!videoId) return json(400, { error: "Invalid YouTube URL" });
 
-    if (!videoId) {
-      return new Response(JSON.stringify({ error: "Invalid YouTube URL" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // Fetch oEmbed data from YouTube (No API key required)
     const oembedRes = await fetch(
-      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
     );
+    if (!oembedRes.ok) return json(404, { error: "Could not fetch video details" });
 
-    if (!oembedRes.ok) {
-      return new Response(
-        JSON.stringify({ error: "Could not fetch video details" }),
-        {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+    const data = await oembedRes.json() as { title?: unknown };
+    if (typeof data.title !== "string" || !data.title) {
+      return json(502, { error: "YouTube returned invalid video details" });
     }
 
-    const data = await oembedRes.json();
-
-    return new Response(
-      JSON.stringify({
-        title: data.title,
-        thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, // better quality than oembed thumbnail
-        youtubeId: videoId,
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    return json(200, {
+      title: data.title,
+      thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+      youtubeId: videoId,
+    });
   } catch (error) {
     console.error("YouTube Meta API Error:", error);
-    return new Response(JSON.stringify({ error: "Internal Server Error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json(500, { error: "Internal Server Error" });
   }
 };

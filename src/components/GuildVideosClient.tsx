@@ -541,6 +541,16 @@ export default function GuildVideosClient() {
       }
       if (recipientId === currentUser.uid) throw new Error("You cannot connect with yourself.");
 
+      const existingConnection = connections.find((connection) => connection.other.uid === recipientId);
+      if (existingConnection?.status === "accepted") {
+        throw new Error(`You are already connected with @${normalizedUsername}.`);
+      }
+      if (existingConnection?.status === "pending") {
+        throw new Error(existingConnection.requesterId === currentUser.uid
+          ? `A connection request to @${normalizedUsername} is already pending.`
+          : `@${normalizedUsername} has already sent you a request.`);
+      }
+
       await sendConnectionRequest(currentUser.uid, recipientId);
       setUsernameInput("");
       setUsernameSuggestions([]);

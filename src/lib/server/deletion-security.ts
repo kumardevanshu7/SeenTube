@@ -8,18 +8,15 @@ const scrypt = promisify(nodeScrypt);
 const COLLECTION = "deletionCredentials";
 const MAX_FAILURES = 5;
 const LOCK_MS = 10 * 60 * 1000;
+const MAX_ANSWER_LENGTH = 256;
 
 type CredentialRecord = {
   version: number;
-  passwordHash: string;
-  passwordSalt: string;
   answerHash: string;
   answerSalt: string;
   securityQuestion: string;
-  deleteFailureCount?: number;
-  deleteLockUntil?: number;
-  answerFailureCount?: number;
-  answerLockUntil?: number;
+  failureCount?: number;
+  lockUntil?: number;
   createdAt: number;
   updatedAt: number;
 };
@@ -27,7 +24,6 @@ type CredentialRecord = {
 export type DeletionSecurityCode =
   | "NOT_CONFIGURED"
   | "ALREADY_CONFIGURED"
-  | "INVALID_PASSWORD"
   | "INVALID_ANSWER"
   | "LOCKED";
 
@@ -85,56 +81,37 @@ const hashesMatch = async (value: string, salt: string, expectedHash: string) =>
   const expected = Buffer.from(expectedHash, "base64");
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 };
+
 const credentialRef = (uid: string) => getAdminDb().collection(COLLECTION).doc(uid);
 
-const validatePassword = (password: string) => {
-  if (password.length < 8 || password.length > 128) throw new Error("Password must be 8–128 characters.");
+const validateQuestion = (question: string) => {
+  const trimmed = question.trim();
+  if (trimmed.length < 5 || trimmed.length > 160) throw new Error("Security question must be 5–160 characters.");
+  return trimmed;
 };
 
-const validateQuestionAndAnswer = (question: string, answer: string) => {
-  if (question.trim().length < 5 || question.trim().length > 160) throw new Error("Security question must be 5–160 characters.");
+// The security answer has no fixed length: any non-empty answer is accepted.
+// A generous upper bound only guards against abuse and is never shown to users.
+const validateAnswer = (answer: string) => {
   const normalized = normalizeAnswer(answer);
-  if (normalized.length < 2 || normalized.length > 128) throw new Error("Security answer must be 2–128 characters.");
+  if (!normalized) throw new Error("Enter a security answer.");
+  if (normalized.length > MAX_ANSWER_LENGTH) throw new Error("Security answer is too long.");
   return normalized;
 };
 
-async function recordFailure(ref: DocumentReference, kind: "delete" | "answer") {
-  const countField = kind === "delete" ? "deleteFailureCount" : "answerFailureCount";
-  const lockField = kind === "delete" ? "deleteLockUntil" : "answerLockUntil";
+async function recordFailure(ref: DocumentReference) {
   await getAdminDb().runTransaction(async (transaction) => {
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists) return;
-    const current = Number(snapshot.get(countField) || 0) + 1;
+    const current = Number(snapshot.get("failureCount") || 0) + 1;
     transaction.update(ref, current >= MAX_FAILURES
-      ? { [countField]: 0, [lockField]: Date.now() + LOCK_MS, updatedAt: Date.now() }
-      : { [countField]: current, updatedAt: Date.now() });
+      ? { failureCount: 0, lockUntil: Date.now() + LOCK_MS, updatedAt: Date.now() }
+      : { failureCount: current, updatedAt: Date.now() });
   });
 }
 
-async function clearFailures(ref: DocumentReference, kind: "delete" | "answer") {
-  const countField = kind === "delete" ? "deleteFailureCount" : "answerFailureCount";
-  const lockField = kind === "delete" ? "deleteLockUntil" : "answerLockUntil";
-  await ref.set({ [countField]: 0, [lockField]: 0, updatedAt: Date.now() }, { merge: true });
-}
-
-async function verifyStoredSecret(uid: string, value: string, kind: "delete" | "answer") {
-  const ref = credentialRef(uid);
-  const snapshot = await ref.get();
-  if (!snapshot.exists) throw new DeletionSecurityError("NOT_CONFIGURED", "Set your deletion password in Settings first.");
-  const data = snapshot.data() as CredentialRecord;
-  const lockUntil = Number(kind === "delete" ? data.deleteLockUntil : data.answerLockUntil) || 0;
-  if (lockUntil > Date.now()) throw new DeletionSecurityError("LOCKED", "Too many incorrect attempts. Try again in 10 minutes.");
-
-  const normalized = kind === "answer" ? normalizeAnswer(value) : value;
-  const salt = kind === "delete" ? data.passwordSalt : data.answerSalt;
-  const hash = kind === "delete" ? data.passwordHash : data.answerHash;
-  const valid = Boolean(normalized && salt && hash) && await hashesMatch(normalized, salt, hash);
-  if (!valid) {
-    await recordFailure(ref, kind);
-    throw new DeletionSecurityError(kind === "delete" ? "INVALID_PASSWORD" : "INVALID_ANSWER", kind === "delete" ? "Incorrect deletion password." : "Incorrect security answer.");
-  }
-  await clearFailures(ref, kind);
-  return data;
+async function clearFailures(ref: DocumentReference) {
+  await ref.set({ failureCount: 0, lockUntil: 0, updatedAt: Date.now() }, { merge: true });
 }
 
 export async function getDeletionSecurity(uid: string) {
@@ -144,77 +121,66 @@ export async function getDeletionSecurity(uid: string) {
   return { configured: true, securityQuestion: typeof question === "string" ? question : "" };
 }
 
-export async function verifyDeletionPassword(uid: string, password: string) {
-  if (!password || password.length > 128) throw new DeletionSecurityError("INVALID_PASSWORD", "Incorrect deletion password.");
-  await verifyStoredSecret(uid, password, "delete");
+// Verifies the security answer. Used both for deletion and for changing credentials.
+export async function verifyDeletionAnswer(uid: string, answer: string) {
+  const ref = credentialRef(uid);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) throw new DeletionSecurityError("NOT_CONFIGURED", "Set your security question in Settings first.");
+
+  const data = snapshot.data() as CredentialRecord;
+  const lockUntil = Number(data.lockUntil) || 0;
+  if (lockUntil > Date.now()) throw new DeletionSecurityError("LOCKED", "Too many incorrect answers. Try again in 10 minutes.");
+
+  const normalized = normalizeAnswer(answer);
+  const valid = Boolean(normalized && data.answerSalt && data.answerHash)
+    && await hashesMatch(normalized, data.answerSalt, data.answerHash);
+  if (!valid) {
+    await recordFailure(ref);
+    throw new DeletionSecurityError("INVALID_ANSWER", "Incorrect security answer.");
+  }
+  await clearFailures(ref);
 }
-export async function setupDeletionSecurity(uid: string, password: string, question: string, answer: string) {
-  validatePassword(password);
-  const normalizedAnswer = validateQuestionAndAnswer(question, answer);
-  const [passwordResult, answerResult] = await Promise.all([
-    createHash(password),
-    createHash(normalizedAnswer),
-  ]);
+
+export async function setupDeletionSecurity(uid: string, question: string, answer: string) {
+  const trimmedQuestion = validateQuestion(question);
+  const normalizedAnswer = validateAnswer(answer);
+  const answerResult = await createHash(normalizedAnswer);
   const now = Date.now();
   await getAdminDb().runTransaction(async (transaction) => {
     const ref = credentialRef(uid);
     const snapshot = await transaction.get(ref);
     if (snapshot.exists) throw new DeletionSecurityError("ALREADY_CONFIGURED", "Deletion security is already configured.");
     transaction.set(ref, {
-      version: 1,
-      passwordHash: passwordResult.hash,
-      passwordSalt: passwordResult.salt,
+      version: 2,
       answerHash: answerResult.hash,
       answerSalt: answerResult.salt,
-      securityQuestion: question.trim(),
-      deleteFailureCount: 0,
-      deleteLockUntil: 0,
-      answerFailureCount: 0,
-      answerLockUntil: 0,
+      securityQuestion: trimmedQuestion,
+      failureCount: 0,
+      lockUntil: 0,
       createdAt: now,
       updatedAt: now,
     } satisfies CredentialRecord);
   });
 }
 
+// Changing the question/answer requires answering the current question correctly.
 export async function changeDeletionSecurity(
   uid: string,
-  currentPassword: string,
-  newPassword: string,
+  currentAnswer: string,
   question: string,
   answer: string,
 ) {
-  await verifyDeletionPassword(uid, currentPassword);
-  validatePassword(newPassword);
-  const normalizedAnswer = validateQuestionAndAnswer(question, answer);
-  const [passwordResult, answerResult] = await Promise.all([
-    createHash(newPassword),
-    createHash(normalizedAnswer),
-  ]);
+  await verifyDeletionAnswer(uid, currentAnswer);
+  const trimmedQuestion = validateQuestion(question);
+  const normalizedAnswer = validateAnswer(answer);
+  const answerResult = await createHash(normalizedAnswer);
   await credentialRef(uid).set({
-    version: 1,
-    passwordHash: passwordResult.hash,
-    passwordSalt: passwordResult.salt,
+    version: 2,
     answerHash: answerResult.hash,
     answerSalt: answerResult.salt,
-    securityQuestion: question.trim(),
-    deleteFailureCount: 0,
-    deleteLockUntil: 0,
-    answerFailureCount: 0,
-    answerLockUntil: 0,
-    updatedAt: Date.now(),
-  }, { merge: true });
-}
-
-export async function resetDeletionPassword(uid: string, answer: string, newPassword: string) {
-  await verifyStoredSecret(uid, answer, "answer");
-  validatePassword(newPassword);
-  const passwordResult = await createHash(newPassword);
-  await credentialRef(uid).set({
-    passwordHash: passwordResult.hash,
-    passwordSalt: passwordResult.salt,
-    deleteFailureCount: 0,
-    deleteLockUntil: 0,
+    securityQuestion: trimmedQuestion,
+    failureCount: 0,
+    lockUntil: 0,
     updatedAt: Date.now(),
   }, { merge: true });
 }

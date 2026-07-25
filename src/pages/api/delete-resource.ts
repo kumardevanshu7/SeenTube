@@ -4,7 +4,7 @@ import {
   DeletionSecurityError,
   FirebaseAdminConfigurationError,
   getAdminDb,
-  verifyDeletionPassword,
+  verifyDeletionAnswer,
 } from "@/lib/server/deletion-security";
 
 export const prerender = false;
@@ -26,14 +26,14 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     const decodedToken = await authenticateRequest(request);
     const body = await request.json() as Record<string, unknown>;
-    const password = typeof body.password === "string" ? body.password : "";
+    const answer = typeof body.answer === "string" ? body.answer : "";
     const resourceId = typeof body.resourceId === "string" ? body.resourceId : "";
     const resourceType = body.resourceType;
 
     if (!resourceId || resourceId.includes("/") || (resourceType !== "roadmap" && resourceType !== "video")) {
       return json(400, { error: "Invalid deletion request." });
     }
-    await verifyDeletionPassword(decodedToken.uid, password);
+    await verifyDeletionAnswer(decodedToken.uid, answer);
 
     const firestore = getAdminDb();
     if (resourceType === "roadmap") {

@@ -6,7 +6,6 @@ import {
   FirebaseAdminConfigurationError,
   getDeletionSecurity,
   isFirebaseAdminConfigured,
-  resetDeletionPassword,
   setupDeletionSecurity,
 } from "@/lib/server/deletion-security";
 
@@ -67,11 +66,9 @@ export const POST: APIRoute = async ({ request }) => {
     const text = (key: string) => typeof body[key] === "string" ? body[key] as string : "";
 
     if (action === "setup") {
-      await setupDeletionSecurity(user.uid, text("password"), text("question"), text("answer"));
+      await setupDeletionSecurity(user.uid, text("question"), text("answer"));
     } else if (action === "change") {
-      await changeDeletionSecurity(user.uid, text("currentPassword"), text("newPassword"), text("question"), text("answer"));
-    } else if (action === "reset") {
-      await resetDeletionPassword(user.uid, text("answer"), text("newPassword"));
+      await changeDeletionSecurity(user.uid, text("currentAnswer"), text("question"), text("answer"));
     } else {
       return json(400, { error: "Invalid settings action." });
     }

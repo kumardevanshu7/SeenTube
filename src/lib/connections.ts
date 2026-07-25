@@ -5,6 +5,7 @@ import {
   onSnapshot,
   query,
   runTransaction,
+  setDoc,
   where,
   type DocumentData,
   type DocumentReference,
@@ -48,28 +49,22 @@ export async function sendConnectionRequest(requesterId: string, recipientId: st
   const requester = requireUid(requesterId, "Requester ID");
   const recipient = requireUid(recipientId, "Recipient ID");
   const connectionRef = getConnectionRef(requester, recipient);
+  const now = Date.now();
+  const participants = [requester, recipient]
+    .sort((a, b) => a.localeCompare(b)) as [string, string];
 
-  await runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(connectionRef);
-    if (snapshot.exists()) {
-      const current = snapshot.data() as Partial<Connection>;
-      if (current.status === "accepted") throw new Error("You are already connected.");
-      if (current.status === "pending") throw new Error("A connection request is already pending.");
-      throw new Error("This connection is in an invalid state.");
-    }
-
-    const now = Date.now();
-    const participants = [requester, recipient]
-      .sort((a, b) => a.localeCompare(b)) as [string, string];
-    transaction.set(connectionRef, {
-      participants,
-      requesterId: requester,
-      recipientId: recipient,
-      status: "pending",
-      createdAt: now,
-      updatedAt: now,
-    } satisfies Connection);
-  });
+  // Do not read first: secure participant-based rules cannot authorize a read
+  // of a connection document that does not exist yet. A deterministic set is
+  // classified as create for a new pair and update for an existing pair, so
+  // the rules remain the race-safe authority against duplicates/overwrites.
+  await setDoc(connectionRef, {
+    participants,
+    requesterId: requester,
+    recipientId: recipient,
+    status: "pending",
+    createdAt: now,
+    updatedAt: now,
+  } satisfies Connection);
 
   return connectionRef.id;
 }

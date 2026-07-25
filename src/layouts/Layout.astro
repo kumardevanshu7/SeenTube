@@ -22,6 +22,7 @@ const {
   showNav = true,
   user = null,
 } = Astro.props;
+const isProduction = import.meta.env.PROD;
 ---
 
 <!doctype html>
@@ -31,7 +32,15 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
     <meta name="theme-color" content="#ffffff" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="application-name" content="SeenTube" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SeenTube" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>{title} — SeenTube</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -45,6 +54,15 @@ const {
         sessionStorage.setItem(key, String(Date.now()));
         window.location.reload();
       });
+    </script>
+    <script define:vars={{ isProduction }}>
+      if (isProduction && "serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js", { scope: "/" })
+            .then((registration) => registration.update())
+            .catch((error) => console.error("Service worker registration failed:", error));
+        }, { once: true });
+      }
     </script>
   </head>
   <body class="min-h-screen bg-background text-foreground antialiased">

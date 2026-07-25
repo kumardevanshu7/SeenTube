@@ -1,16 +1,23 @@
 import { useEffect, useState, type FormEvent } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { AlertTriangle, Loader2, LockKeyhole, X } from "lucide-react";
+import { AlertTriangle, HelpCircle, Loader2, ShieldQuestion, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getDeletionQuestion } from "@/lib/delete-resource";
 
 type DeletePasswordDialogProps = {
   open: boolean;
   resourceName: string;
   resourceLabel: string;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (password: string) => Promise<void>;
+  onConfirm: (answer: string) => Promise<void>;
 };
+
+type QuestionState =
+  | { status: "loading" }
+  | { status: "ready"; question: string }
+  | { status: "not-configured" }
+  | { status: "error"; message: string };
 
 export default function DeletePasswordDialog({
   open,
@@ -19,32 +26,63 @@ export default function DeletePasswordDialog({
   onOpenChange,
   onConfirm,
 }: DeletePasswordDialogProps) {
-  const [password, setPassword] = useState("");
+  const [answer, setAnswer] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [questionState, setQuestionState] = useState<QuestionState>({ status: "loading" });
 
   useEffect(() => {
-    if (open) return;
-    setPassword("");
-    setError("");
-    setSubmitting(false);
+    if (!open) {
+      setAnswer("");
+      setError("");
+      setSubmitting(false);
+      setQuestionState({ status: "loading" });
+      return;
+    }
+
+    let active = true;
+    setQuestionState({ status: "loading" });
+    void (async () => {
+      try {
+        const security = await getDeletionQuestion();
+        if (!active) return;
+        if (!security.serverConfigured) {
+          setQuestionState({ status: "error", message: "Deletion security is not available right now." });
+        } else if (!security.configured || !security.securityQuestion) {
+          setQuestionState({ status: "not-configured" });
+        } else {
+          setQuestionState({ status: "ready", question: security.securityQuestion });
+        }
+      } catch (caughtError) {
+        if (!active) return;
+        setQuestionState({
+          status: "error",
+          message: caughtError instanceof Error ? caughtError.message : "Could not load your security question.",
+        });
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, [open]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!password || submitting) return;
+    if (!answer.trim() || submitting) return;
     setSubmitting(true);
     setError("");
     try {
-      await onConfirm(password);
+      await onConfirm(answer);
       onOpenChange(false);
     } catch (caughtError) {
-      setPassword("");
+      setAnswer("");
       setError(caughtError instanceof Error ? caughtError.message : "Deletion failed.");
     } finally {
       setSubmitting(false);
     }
   };
+
   return (
     <Dialog.Root open={open} onOpenChange={(nextOpen) => !submitting && onOpenChange(nextOpen)}>
       <Dialog.Portal>
@@ -71,25 +109,69 @@ export default function DeletePasswordDialog({
             </Dialog.Close>
           </div>
 
-          <form onSubmit={handleSubmit}>
-            <label htmlFor="delete-password" className="mb-2 block text-sm font-semibold">Deletion password</label>
-            <div className="relative">
-              <LockKeyhole className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input id="delete-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="pl-9" placeholder="Enter your deletion password" autoComplete="current-password" autoFocus disabled={submitting} required />
+          {questionState.status === "loading" && (
+            <div className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-4 text-sm text-muted-foreground" role="status">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading your security question…
             </div>
-            <div className="mt-2 flex items-start justify-between gap-3">
-              <span className="text-xs text-muted-foreground">Your personal password from Settings.</span>
-              <a href="/settings" className="shrink-0 text-xs font-semibold text-primary hover:underline">Forgot it?</a>
+          )}
+
+          {questionState.status === "not-configured" && (
+            <div className="rounded-lg border border-border bg-secondary p-4 text-sm">
+              <p className="font-semibold text-foreground">Set up deletion security first</p>
+              <p className="mt-1 text-muted-foreground">Add your security question and answer in Settings before deleting anything.</p>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                <Button asChild><a href="/settings"><ShieldQuestion /> Open Settings</a></Button>
+              </div>
             </div>
-            {error && <p className="mt-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
-            <div className="mt-5 grid grid-cols-2 gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
-              <Button type="submit" variant="destructive" disabled={submitting || !password}>
-                {submitting ? <Loader2 className="animate-spin" /> : <AlertTriangle />}
-                {submitting ? "Deleting…" : "Delete permanently"}
-              </Button>
+          )}
+
+          {questionState.status === "error" && (
+            <div className="rounded-lg border border-border bg-secondary p-4 text-sm">
+              <p className="font-medium text-destructive" role="alert">{questionState.message}</p>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+                <Button type="button" onClick={() => setQuestionState({ status: "loading" })}>Try again</Button>
+              </div>
             </div>
-          </form>
+          )}
+
+          {questionState.status === "ready" && (
+            <form onSubmit={handleSubmit}>
+              <div className="mb-3 rounded-lg border border-border bg-secondary p-3">
+                <div className="flex items-center gap-2 text-primary">
+                  <HelpCircle className="h-4 w-4" />
+                  <span className="text-xs font-bold uppercase tracking-wide">Security question</span>
+                </div>
+                <p className="mt-1.5 font-semibold text-foreground">{questionState.question}</p>
+              </div>
+
+              <label htmlFor="delete-answer" className="mb-2 block text-sm font-semibold">Your answer</label>
+              <Input
+                id="delete-answer"
+                type="text"
+                value={answer}
+                onChange={(event) => setAnswer(event.target.value)}
+                placeholder="Type your security answer"
+                autoComplete="off"
+                autoFocus
+                disabled={submitting}
+                required
+              />
+              <div className="mt-2 flex items-start justify-between gap-3">
+                <span className="text-xs text-muted-foreground">Capital letters and extra spaces are ignored.</span>
+                <a href="/settings" className="shrink-0 text-xs font-semibold text-primary hover:underline">Manage</a>
+              </div>
+              {error && <p className="mt-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
+                <Button type="submit" variant="destructive" disabled={submitting || !answer.trim()}>
+                  {submitting ? <Loader2 className="animate-spin" /> : <AlertTriangle />}
+                  {submitting ? "Deleting…" : "Delete permanently"}
+                </Button>
+              </div>
+            </form>
+          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
