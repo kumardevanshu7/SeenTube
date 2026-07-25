@@ -59,6 +59,7 @@ function StepStatusPicker({
 type RoadmapStepListProps = {
   steps: RoadmapStep[];
   editable?: boolean;
+  allowRemove?: boolean;
   statusEditable?: boolean;
   updatingStepId?: string | null;
   onMove?: (index: number, direction: -1 | 1) => void;
@@ -69,6 +70,7 @@ type RoadmapStepListProps = {
 export default function RoadmapStepList({
   steps,
   editable = false,
+  allowRemove = true,
   statusEditable = false,
   updatingStepId,
   onMove,
@@ -124,9 +126,11 @@ export default function RoadmapStepList({
                 <Button type="button" variant="ghost" size="icon-sm" onClick={() => onMove?.(index, 1)} disabled={index === steps.length - 1} aria-label={`Move step ${index + 1} down`}>
                   <ArrowDown />
                 </Button>
-                <Button type="button" variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" onClick={() => onRemove?.(index)} aria-label={`Remove step ${index + 1}`}>
-                  <Trash2 />
-                </Button>
+                {allowRemove && (
+                  <Button type="button" variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" onClick={() => onRemove?.(index)} aria-label={`Remove step ${index + 1}`}>
+                    <Trash2 />
+                  </Button>
+                )}
               </div>
             )}
           </article>

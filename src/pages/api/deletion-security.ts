@@ -7,6 +7,7 @@ import {
   getDeletionSecurity,
   isFirebaseAdminConfigured,
   setupDeletionSecurity,
+  verifyDeletionAnswer,
 } from "@/lib/server/deletion-security";
 
 export const prerender = false;
@@ -64,6 +65,11 @@ export const POST: APIRoute = async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
     const action = body.action;
     const text = (key: string) => typeof body[key] === "string" ? body[key] as string : "";
+
+    if (action === "verify") {
+      await verifyDeletionAnswer(user.uid, text("answer"));
+      return json(200, { verified: true });
+    }
 
     if (action === "setup") {
       await setupDeletionSecurity(user.uid, text("question"), text("answer"));

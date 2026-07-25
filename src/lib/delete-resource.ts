@@ -34,6 +34,25 @@ export async function getDeletionQuestion(): Promise<DeletionQuestion> {
   };
 }
 
+// Verifies the user's security answer without performing any deletion.
+// Used to gate sensitive owner actions such as reordering roadmap videos.
+export async function verifyDeletionAnswer(answer: string) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Please sign in again.");
+
+  const token = await user.getIdToken();
+  const response = await fetch("/api/deletion-security", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ action: "verify", answer }),
+  });
+  const result = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok) throw new Error(result.error || "Could not verify your security answer.");
+}
+
 export async function deleteProtectedResource(
   resourceType: ProtectedResourceType,
   resourceId: string,

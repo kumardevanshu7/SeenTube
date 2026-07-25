@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import {
   ArrowLeft,
+  ArrowUpDown,
   CheckCircle2,
   Copy,
   Globe2,
@@ -18,22 +19,25 @@ import {
   Lock,
   Map,
   Pencil,
+  Save,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { auth, db } from "@/lib/firebase";
 import { invalidateCache } from "@/lib/data-cache";
-import { deleteProtectedResource } from "@/lib/delete-resource";
+import { deleteProtectedResource, verifyDeletionAnswer } from "@/lib/delete-resource";
 import { getConnectionRef, type Connection } from "@/lib/connections";
 import {
   getRoadmapProgress,
   makeStepId,
   normalizeRoadmap,
   type Roadmap,
+  type RoadmapStep,
   type RoadmapStepStatus,
 } from "@/lib/roadmaps";
 import RoadmapStepList from "@/components/RoadmapStepList";
 import DeletePasswordDialog from "@/components/DeletePasswordDialog";
+import SecurityAnswerDialog from "@/components/SecurityAnswerDialog";
 import { Button } from "@/components/ui/button";
 
 type DetailState = "loading" | "ready" | "not-found" | "forbidden" | "error";
@@ -50,6 +54,10 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
   const [copying, setCopying] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [draftSteps, setDraftSteps] = useState<RoadmapStep[]>([]);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -247,6 +255,69 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
     }
   };
 
+  // Unlock reordering only after the owner passes their security answer.
+  const confirmReorderAccess = async (answer: string) => {
+    await verifyDeletionAnswer(answer);
+    setDraftSteps(roadmap ? roadmap.steps.map((step) => ({ ...step })) : []);
+    setReorderMode(true);
+  };
+
+  const moveDraftStep = (index: number, direction: -1 | 1) => {
+    setDraftSteps((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.length) return current;
+      const reordered = [...current];
+      [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+      return reordered;
+    });
+  };
+
+  const cancelReorder = () => {
+    setReorderMode(false);
+    setDraftSteps([]);
+  };
+
+  const saveOrder = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !roadmap || roadmap.ownerId !== currentUser.uid || savingOrder) return;
+
+    setSavingOrder(true);
+    try {
+      const roadmapRef = doc(db, "roadmaps", roadmap.id);
+      const orderedIds = draftSteps.map((step) => step.id);
+      const savedSteps = await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(roadmapRef);
+        if (!snapshot.exists()) throw new Error("This roadmap no longer exists.");
+        const currentRoadmap = normalizeRoadmap(snapshot.id, snapshot.data());
+        if (!currentRoadmap || currentRoadmap.ownerId !== currentUser.uid) {
+          throw new Error("Only the roadmap owner can reorder videos.");
+        }
+        // Apply the drafted order to the latest steps, skipping any that were
+        // removed elsewhere and appending any that were added in the meantime.
+        const byId = new globalThis.Map(currentRoadmap.steps.map((step) => [step.id, step] as const));
+        const reordered = orderedIds.flatMap((id) => {
+          const step = byId.get(id);
+          return step ? [step] : [];
+        });
+        currentRoadmap.steps.forEach((step) => {
+          if (!orderedIds.includes(step.id)) reordered.push(step);
+        });
+        transaction.update(roadmapRef, { steps: reordered, updatedAt: Date.now() });
+        return reordered;
+      });
+      setRoadmap((current) => current ? { ...current, steps: savedSteps, updatedAt: Date.now() } : current);
+      invalidateCache("roadmaps:");
+      toast.success("Sequence updated");
+      setReorderMode(false);
+      setDraftSteps([]);
+    } catch (error) {
+      console.error("Roadmap reorder error:", error);
+      toast.error(error instanceof Error ? error.message : "Could not update the sequence.");
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+
   if (state === "loading") {
     return (
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6">
@@ -327,12 +398,43 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
           <div>
             <h2 id="roadmap-steps-title" className="text-2xl font-bold">Your learning path</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {isOwner ? "Update each video as you move through the roadmap." : `See @${ownerName}'s current progress.`}
+              {reorderMode
+                ? "Use the arrows to change the order, then save."
+                : isOwner ? "Update each video as you move through the roadmap." : `See @${ownerName}'s current progress.`}
             </p>
           </div>
           <span className="text-sm font-semibold text-muted-foreground">{progress.total} videos</span>
         </div>
-        {roadmap.steps.length > 0 ? (
+
+        {isOwner && !reorderMode && roadmap.steps.length > 1 && (
+          <div className="mb-4">
+            <Button type="button" variant="outline" onClick={() => setOrderDialogOpen(true)}>
+              <ArrowUpDown /> Change sequence
+            </Button>
+          </div>
+        )}
+
+        {reorderMode ? (
+          <>
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm font-medium text-foreground">
+              <ArrowUpDown className="h-4 w-4 shrink-0 text-primary" />
+              Reorder mode is unlocked — arrange the videos, then save the sequence.
+            </div>
+            <RoadmapStepList
+              steps={draftSteps}
+              editable
+              allowRemove={false}
+              onMove={moveDraftStep}
+            />
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Button type="button" variant="outline" onClick={cancelReorder} disabled={savingOrder}>Cancel</Button>
+              <Button type="button" onClick={saveOrder} disabled={savingOrder}>
+                {savingOrder ? <Loader2 className="animate-spin" /> : <Save />}
+                {savingOrder ? "Saving…" : "Save sequence"}
+              </Button>
+            </div>
+          </>
+        ) : roadmap.steps.length > 0 ? (
           <RoadmapStepList
             steps={roadmap.steps}
             statusEditable={isOwner}
@@ -346,6 +448,7 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
         )}
       </section>
 
+      {!reorderMode && (
       <section className="sticky bottom-20 z-10 rounded-lg border border-border bg-white p-3 shadow-lg lg:static lg:shadow-none" aria-label="Roadmap actions">
         {isOwner ? (
           <div className="grid gap-2 sm:grid-cols-2">
@@ -371,6 +474,7 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
           </Button>
         )}
       </section>
+      )}
 
       {progress.total > 0 && progress.completed === progress.total && (
         <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
@@ -387,6 +491,16 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
           if (!deleting) setDeleteDialogOpen(open);
         }}
         onConfirm={deleteRoadmap}
+      />
+
+      <SecurityAnswerDialog
+        open={orderDialogOpen}
+        title="Change video sequence"
+        description="Enter your security answer to unlock reordering for this roadmap."
+        confirmLabel="Unlock reordering"
+        pendingLabel="Verifying…"
+        onOpenChange={setOrderDialogOpen}
+        onConfirm={confirmReorderAccess}
       />
     </div>
   );
