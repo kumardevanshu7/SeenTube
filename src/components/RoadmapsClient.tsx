@@ -19,6 +19,7 @@ import {
   Map,
   Plus,
   Save,
+  UsersRound,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -30,6 +31,7 @@ import {
   makeStepId,
   normalizeRoadmap,
   timeValue,
+  youtubeWatchUrl,
   type Roadmap,
   type RoadmapStep,
   type RoadmapStepStatus,
@@ -38,10 +40,50 @@ import {
 import RoadmapStepList from "@/components/RoadmapStepList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import { redirectNeedsUsername, redirectSignedOut, waitForAuthUser } from "@/lib/auth";
+
+export type RoadmapsMode = "own" | "connections";
 
 type YoutubeMeta = Pick<RoadmapStep, "youtubeId" | "title" | "thumbnail"> & {
   error?: string;
 };
+
+function RoadmapsTabs({ mode }: { mode: RoadmapsMode }) {
+  return (
+    <div className="mb-2 flex flex-wrap gap-2" role="tablist" aria-label="Roadmap pages">
+      <a
+        href="/roadmaps"
+        role="tab"
+        aria-selected={mode === "own"}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors",
+          mode === "own"
+            ? "border-primary bg-primary text-white"
+            : "border-border bg-white text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <Map className="h-3.5 w-3.5" />
+        Your roadmaps
+      </a>
+      <a
+        href="/roadmaps/connections"
+        role="tab"
+        aria-selected={mode === "connections"}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors",
+          mode === "connections"
+            ? "border-primary bg-primary text-white"
+            : "border-border bg-white text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <UsersRound className="h-3.5 w-3.5" />
+        Connections&apos; roadmaps
+      </a>
+    </div>
+  );
+}
+
 function RoadmapSummaryCard({
   roadmap,
   ownerName,
@@ -117,7 +159,7 @@ function RoadmapSummaryCard({
   );
 }
 
-export default function RoadmapsClient() {
+export default function RoadmapsClient({ mode = "own" }: { mode?: RoadmapsMode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
@@ -135,48 +177,57 @@ export default function RoadmapsClient() {
 
   useEffect(() => {
     let active = true;
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        window.location.replace("/");
+    const unsubscribe = onAuthStateChanged(auth, async () => {
+      const signedInUser = await waitForAuthUser();
+      if (!active) return;
+
+      if (!signedInUser) {
+        redirectSignedOut("/");
         return;
       }
 
-      setUser(currentUser);
+      setUser(signedInUser);
       try {
-        const profileSnapshot = await getDoc(doc(db, "users", currentUser.uid));
+        const profileSnapshot = await getDoc(doc(db, "users", signedInUser.uid));
         if (!profileSnapshot.data()?.username) {
-          window.location.replace("/onboarding");
+          redirectNeedsUsername();
           return;
         }
 
-        const connectionDocuments = await getUserConnectionDocuments(currentUser.uid);
+        const roadmapsRef = collection(db, "roadmaps");
+
+        if (mode === "own") {
+          const ownSnapshot = await getDocs(query(roadmapsRef, where("ownerId", "==", signedInUser.uid)));
+          if (!active) return;
+          const loadedRoadmaps = ownSnapshot.docs
+            .map((snapshot) => normalizeRoadmap(snapshot.id, snapshot.data()))
+            .filter((roadmap): roadmap is Roadmap => Boolean(roadmap))
+            .sort((a, b) => timeValue(b.updatedAt) - timeValue(a.updatedAt));
+          setRoadmaps(loadedRoadmaps);
+          setUsernames({ [signedInUser.uid]: "you" });
+          return;
+        }
+
+        const connectionDocuments = await getUserConnectionDocuments(signedInUser.uid);
         const acceptedOwnerIds = Array.from(new Set(
           connectionDocuments.flatMap((connectionDocument) => {
             const connection = connectionDocument.data();
             if (connection.status !== "accepted" || !Array.isArray(connection.participants)) return [];
             const otherUid = connection.participants.find((uid: unknown) => (
-              typeof uid === "string" && uid !== currentUser.uid
+              typeof uid === "string" && uid !== signedInUser.uid
             ));
             return typeof otherUid === "string" ? [otherUid] : [];
           }),
         ));
 
-        const roadmapsRef = collection(db, "roadmaps");
-        const [ownSnapshot, connectedSnapshots] = await Promise.all([
-          getDocs(query(roadmapsRef, where("ownerId", "==", currentUser.uid))),
-          Promise.all(acceptedOwnerIds.map((ownerId) => getDocs(query(
-            roadmapsRef,
-            where("ownerId", "==", ownerId),
-            where("visibility", "==", "public"),
-          )))),
-        ]);
+        const connectedSnapshots = await Promise.all(acceptedOwnerIds.map((ownerId) => getDocs(query(
+          roadmapsRef,
+          where("ownerId", "==", ownerId),
+          where("visibility", "==", "public"),
+        ))));
         if (!active) return;
 
         const merged = new globalThis.Map<string, Roadmap>();
-        ownSnapshot.docs.forEach((snapshot) => {
-          const roadmap = normalizeRoadmap(snapshot.id, snapshot.data());
-          if (roadmap) merged.set(snapshot.id, roadmap);
-        });
         connectedSnapshots.forEach((snapshot) => {
           snapshot.docs.forEach((roadmapSnapshot) => {
             const roadmap = normalizeRoadmap(roadmapSnapshot.id, roadmapSnapshot.data());
@@ -209,7 +260,7 @@ export default function RoadmapsClient() {
       active = false;
       unsubscribe();
     };
-  }, []);
+  }, [mode]);
 
   const addStep = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -218,7 +269,12 @@ export default function RoadmapsClient() {
 
     setAddingStep(true);
     try {
-      const response = await fetch(`/api/youtube-meta?url=${encodeURIComponent(url)}`);
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error("Please sign in again.");
+      const token = await currentUser.getIdToken();
+      const response = await fetch(`/api/youtube-meta?url=${encodeURIComponent(url)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const metadata = await response.json() as YoutubeMeta;
       if (!response.ok) throw new Error(metadata.error || "Could not fetch video details");
       if (steps.some((step) => step.youtubeId === metadata.youtubeId)) {
@@ -227,7 +283,7 @@ export default function RoadmapsClient() {
 
       setSteps((current) => [...current, {
         id: makeStepId(),
-        url,
+        url: youtubeWatchUrl(metadata.youtubeId),
         youtubeId: metadata.youtubeId,
         title: metadata.title,
         thumbnail: metadata.thumbnail,
@@ -258,7 +314,14 @@ export default function RoadmapsClient() {
   };
 
   const changeBuilderStepStatus = (stepId: string, status: RoadmapStepStatus) => {
-    setSteps((current) => current.map((step) => step.id === stepId ? { ...step, status } : step));
+    setSteps((current) => current.map((step) => {
+      if (step.id !== stepId) return step;
+      if (step.status === "completed" && status !== "completed") {
+        toast.error("Completed videos are locked and cannot change status.");
+        return step;
+      }
+      return { ...step, status };
+    }));
   };
 
   const resetBuilder = () => {
@@ -300,7 +363,7 @@ export default function RoadmapsClient() {
   };
 
   useEffect(() => {
-    if (loading || !user) return;
+    if (mode !== "own" || loading || !user) return;
     const editId = new URLSearchParams(window.location.search).get("edit");
     if (!editId || handledEditId.current === editId) return;
     handledEditId.current = editId;
@@ -311,7 +374,7 @@ export default function RoadmapsClient() {
       toast.error("Only your own roadmap can be edited.");
       window.history.replaceState({}, "", "/roadmaps");
     }
-  }, [loading, roadmaps, user]);
+  }, [loading, mode, roadmaps, user]);
 
   const saveRoadmap = async () => {
     const cleanTitle = roadmapTitle.trim();
@@ -353,7 +416,7 @@ export default function RoadmapsClient() {
           ownerId: user.uid,
           title: cleanTitle,
           description: "",
-          visibility: "public",
+          visibility: editingVisibility,
           steps,
           createdAt: now,
           updatedAt: now,
@@ -385,31 +448,40 @@ export default function RoadmapsClient() {
 
   if (!user) return null;
 
-  const ownRoadmaps = roadmaps.filter((roadmap) => roadmap.ownerId === user.uid);
-  const communityRoadmaps = roadmaps.filter(
-    (roadmap) => roadmap.ownerId !== user.uid && roadmap.visibility === "public",
-  );
+  const ownRoadmaps = mode === "own" ? roadmaps : [];
+  const communityRoadmaps = mode === "connections" ? roadmaps : [];
 
   return (
     <div className="mx-auto max-w-7xl space-y-10 px-4 py-8 sm:px-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
+          <RoadmapsTabs mode={mode} />
           <div className="mb-2 flex items-center gap-2 text-primary">
             <Map className="h-5 w-5" />
             <span className="text-xs font-bold uppercase tracking-widest">Learn in order</span>
           </div>
-          <h1 className="text-3xl font-bold sm:text-4xl">Mind <span className="text-primary">Roadmaps</span></h1>
+          <h1 className="text-3xl font-bold sm:text-4xl">
+            {mode === "own" ? (
+              <>Your <span className="text-primary">Roadmaps</span></>
+            ) : (
+              <>Connections&apos; <span className="text-primary">Roadmaps</span></>
+            )}
+          </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            See every learning path at a glance, track completion, then open one to follow its videos in order.
+            {mode === "own"
+              ? "Create ordered learning paths, track completion, then open one to follow its videos in order."
+              : "Open a shared path from your connections to view progress or make your own copy."}
           </p>
         </div>
-        <Button type="button" size="lg" onClick={toggleBuilder} aria-expanded={showBuilder}>
-          {showBuilder ? <X /> : <Plus />}
-          {showBuilder ? "Close Builder" : "Add Roadmap"}
-        </Button>
+        {mode === "own" && (
+          <Button type="button" size="lg" onClick={toggleBuilder} aria-expanded={showBuilder}>
+            {showBuilder ? <X /> : <Plus />}
+            {showBuilder ? "Close Builder" : "Add Roadmap"}
+          </Button>
+        )}
       </header>
 
-      {showBuilder && (
+      {mode === "own" && showBuilder && (
         <section id="roadmap-builder" className="animate-fade-in scroll-mt-24 rounded-lg border border-border bg-secondary p-3 sm:p-6" aria-labelledby="builder-title">
           <div className="mb-6">
             <p className="text-xs font-bold uppercase tracking-wide text-primary">
@@ -435,6 +507,39 @@ export default function RoadmapsClient() {
               />
               <p className="text-xs text-muted-foreground">
                 This is your roadmap name. YouTube titles are fetched separately for each video.
+              </p>
+            </div>
+
+            <div className="mb-5 space-y-1.5 border-b border-border pb-5">
+              <p className="text-sm font-semibold">Visibility</p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant={editingVisibility === "public" ? "default" : "outline"}
+                  size="sm"
+                  disabled={saving}
+                  onClick={() => setEditingVisibility("public")}
+                  aria-pressed={editingVisibility === "public"}
+                >
+                  <Globe2 />
+                  Public
+                </Button>
+                <Button
+                  type="button"
+                  variant={editingVisibility === "private" ? "default" : "outline"}
+                  size="sm"
+                  disabled={saving}
+                  onClick={() => setEditingVisibility("private")}
+                  aria-pressed={editingVisibility === "private"}
+                >
+                  <Lock />
+                  Private
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {editingVisibility === "public"
+                  ? "Connections can see this roadmap on their Connections tab."
+                  : "Only you can see this roadmap."}
               </p>
             </div>
 
@@ -499,51 +604,53 @@ export default function RoadmapsClient() {
         </section>
       )}
 
-      <section aria-labelledby="your-roadmaps-title">
-        <div className="mb-4 flex items-end justify-between gap-4">
-          <div>
-            <h2 id="your-roadmaps-title" className="text-2xl font-bold">Your roadmaps</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Open a card to see its full path and update progress.</p>
+      {mode === "own" ? (
+        <section aria-labelledby="your-roadmaps-title">
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <h2 id="your-roadmaps-title" className="text-2xl font-bold">Your roadmaps</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Open a card to see its full path and update progress.</p>
+            </div>
+            <span className="text-sm font-semibold text-muted-foreground">{ownRoadmaps.length}</span>
           </div>
-          <span className="text-sm font-semibold text-muted-foreground">{ownRoadmaps.length}</span>
-        </div>
-        {ownRoadmaps.length > 0 ? (
-          <div className="grid items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {ownRoadmaps.map((roadmap) => (
-              <RoadmapSummaryCard key={roadmap.id} roadmap={roadmap} ownerName={usernames[roadmap.ownerId] || "you"} isOwner />
-            ))}
+          {ownRoadmaps.length > 0 ? (
+            <div className="grid items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {ownRoadmaps.map((roadmap) => (
+                <RoadmapSummaryCard key={roadmap.id} roadmap={roadmap} ownerName={usernames[roadmap.ownerId] || "you"} isOwner />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border py-12 text-center">
+              <Map className="mx-auto mb-3 h-8 w-8 text-primary" />
+              <h3 className="font-bold">No roadmaps yet</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Create your first ordered learning path.</p>
+            </div>
+          )}
+        </section>
+      ) : (
+        <section aria-labelledby="community-roadmaps-title">
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <h2 id="community-roadmaps-title" className="text-2xl font-bold">Connections&apos; roadmaps</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Open a shared path to view its progress or make your own copy.</p>
+            </div>
+            <span className="text-sm font-semibold text-muted-foreground">{communityRoadmaps.length}</span>
           </div>
-        ) : (
-          <div className="rounded-lg border border-dashed border-border py-12 text-center">
-            <Map className="mx-auto mb-3 h-8 w-8 text-primary" />
-            <h3 className="font-bold">No roadmaps yet</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Create your first ordered learning path.</p>
-          </div>
-        )}
-      </section>
-
-      <section aria-labelledby="community-roadmaps-title">
-        <div className="mb-4 flex items-end justify-between gap-4">
-          <div>
-            <h2 id="community-roadmaps-title" className="text-2xl font-bold">Connections’ roadmaps</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Open a shared path to view its progress or make your own copy.</p>
-          </div>
-          <span className="text-sm font-semibold text-muted-foreground">{communityRoadmaps.length}</span>
-        </div>
-        {communityRoadmaps.length > 0 ? (
-          <div className="grid items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {communityRoadmaps.map((roadmap) => (
-              <RoadmapSummaryCard key={roadmap.id} roadmap={roadmap} ownerName={usernames[roadmap.ownerId] || "unknown"} isOwner={false} />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-dashed border-border py-12 text-center">
-            <Globe2 className="mx-auto mb-3 h-8 w-8 text-primary" />
-            <h3 className="font-bold">No connected roadmaps yet</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Accept a connection to see the roadmaps they share.</p>
-          </div>
-        )}
-      </section>
+          {communityRoadmaps.length > 0 ? (
+            <div className="grid items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {communityRoadmaps.map((roadmap) => (
+                <RoadmapSummaryCard key={roadmap.id} roadmap={roadmap} ownerName={usernames[roadmap.ownerId] || "unknown"} isOwner={false} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border py-12 text-center">
+              <Globe2 className="mx-auto mb-3 h-8 w-8 text-primary" />
+              <h3 className="font-bold">No connected roadmaps yet</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Accept a connection to see the roadmaps they share.</p>
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

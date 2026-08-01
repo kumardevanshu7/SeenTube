@@ -1,0 +1,11 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import RoadmapsClient from "@/components/RoadmapsClient";
+---
+
+<Layout
+  title="Connections’ Roadmaps"
+  description="Explore learning roadmaps shared by your SeenTube connections"
+>
+  <RoadmapsClient client:load mode="connections" />
+</Layout>

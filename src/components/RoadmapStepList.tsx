@@ -10,7 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { RoadmapStep, RoadmapStepStatus } from "@/lib/roadmaps";
+import { youtubeThumbnailUrl, youtubeWatchUrl, type RoadmapStep, type RoadmapStepStatus } from "@/lib/roadmaps";
 
 type StepStatusPickerProps = {
   status: RoadmapStepStatus;
@@ -30,29 +30,36 @@ function StepStatusPicker({
     { value: "not_completed" as const, label: "Not completed", Icon: CircleX, active: "border-rose-300 bg-rose-50 text-rose-700" },
     { value: "pending" as const, label: "Pending", Icon: Clock3, active: "border-amber-300 bg-amber-50 text-amber-700" },
   ];
+  const isLocked = status === "completed";
 
   return (
     <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Video progress status">
       {options.map(({ value, label, Icon, active }) => {
         const selected = status === value;
+        const optionDisabled = !editable || disabled || (isLocked && !selected);
         return (
           <button
             key={value}
             type="button"
-            title={label}
-            aria-label={`${label}${selected ? ", selected" : ""}`}
+            title={isLocked && !selected ? "Completed status is locked" : label}
+            aria-label={`${label}${selected ? ", selected" : ""}${isLocked && !selected ? ", locked" : ""}`}
             aria-pressed={selected}
-            disabled={!editable || disabled}
+            disabled={optionDisabled}
             onClick={() => onChange?.(value)}
             className={`inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-[11px] font-semibold transition-colors ${
               selected ? active : "border-border bg-white text-muted-foreground"
-            } ${editable ? "hover:border-primary/50" : "cursor-default"}`}
+            } ${editable && !optionDisabled ? "hover:border-primary/50" : "cursor-default"} ${
+              optionDisabled && !selected ? "opacity-50" : ""
+            }`}
           >
             {disabled && selected ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
             <span>{label}</span>
           </button>
         );
       })}
+      {isLocked && editable && (
+        <p className="w-full text-[11px] text-muted-foreground">Completed — status is locked.</p>
+      )}
     </div>
   );
 }
@@ -87,19 +94,19 @@ export default function RoadmapStepList({
             </div>
             <div className="min-w-0 flex-1">
               <a
-                href={step.url}
+                href={youtubeWatchUrl(step.youtubeId)}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="group flex min-w-0 flex-col gap-3 sm:flex-row"
                 aria-label={`Watch ${step.title} on YouTube`}
               >
                 <img
-                  src={step.thumbnail || `https://img.youtube.com/vi/${step.youtubeId}/hqdefault.jpg`}
+                  src={step.thumbnail || youtubeThumbnailUrl(step.youtubeId)}
                   alt=""
                   className="aspect-video w-full shrink-0 rounded-md bg-secondary object-cover sm:h-20 sm:w-32"
                   loading="lazy"
                   onError={(event) => {
-                    event.currentTarget.src = `https://img.youtube.com/vi/${step.youtubeId}/hqdefault.jpg`;
+                    event.currentTarget.src = youtubeThumbnailUrl(step.youtubeId);
                   }}
                 />
                 <span className="min-w-0 self-center">

@@ -51,15 +51,20 @@ import Layout from "@/layouts/Layout.astro";
 </Layout>
 
 <script>
-  import { auth, googleProvider } from "@/lib/firebase";
+  import { auth, googleProvider, authPersistenceReady } from "@/lib/firebase";
   import { getUserProfile } from "@/lib/users";
+  import { markSignedIn } from "@/lib/auth";
   import { signInWithPopup, onAuthStateChanged } from "firebase/auth";
 
   // New and migrated accounts choose a public username before entering the app.
   onAuthStateChanged(auth, async (user) => {
-    if (!user) return;
+    await authPersistenceReady;
+    await auth.authStateReady();
+    const signedInUser = auth.currentUser ?? user;
+    if (!signedInUser) return;
+    markSignedIn();
     try {
-      const profile = await getUserProfile(user.uid);
+      const profile = await getUserProfile(signedInUser.uid);
       window.location.href = profile?.username ? "/dashboard" : "/onboarding";
     } catch (error) {
       console.error("Profile check failed:", error);

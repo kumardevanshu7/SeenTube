@@ -1,0 +1,11 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import GuildVideosClient from "@/components/GuildVideosClient";
+---
+
+<Layout
+  title="Connection videos"
+  description="Discover and import public YouTube videos shared by your SeenTube connections"
+>
+  <GuildVideosClient client:load mode="videos" />
+</Layout>

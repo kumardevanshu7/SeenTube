@@ -320,3 +320,88 @@ a.bg-primary:active { background: hsl(var(--primary-active)); }
     rgba(0, 0, 0, 0.04) 0 2px 6px 0,
     rgba(0, 0, 0, 0.1) 0 4px 8px 0;
 }
+
+/* ── Sonner toasts — keep icon + text on one intact card ── */
+[data-sonner-toaster] {
+  z-index: 9999 !important;
+}
+
+[data-sonner-toast].seentube-toast,
+[data-sonner-toast].group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  width: min(356px, calc(100vw - 2rem)) !important;
+  padding: 0.875rem 1rem !important;
+  margin: 0 !important;
+  border-radius: 0.75rem !important;
+  border: 1px solid hsl(var(--border)) !important;
+  background: #ffffff !important;
+  color: hsl(var(--foreground)) !important;
+  box-shadow:
+    rgba(0, 0, 0, 0.02) 0 0 0 1px,
+    rgba(0, 0, 0, 0.04) 0 2px 6px 0,
+    rgba(0, 0, 0, 0.1) 0 4px 8px 0 !important;
+  font-family: inherit !important;
+  font-size: 0.875rem !important;
+  line-height: 1.35 !important;
+}
+
+[data-sonner-toast] [data-icon] {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  margin: 0 !important;
+  flex-shrink: 0 !important;
+}
+
+[data-sonner-toast] [data-content] {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  gap: 0.125rem !important;
+  min-width: 0 !important;
+}
+
+[data-sonner-toast] [data-title],
+.seentube-toast-title {
+  color: hsl(var(--foreground)) !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+}
+
+[data-sonner-toast] [data-description],
+.seentube-toast-description {
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 0.8125rem !important;
+}
+
+[data-sonner-toast].seentube-toast-success [data-icon] {
+  color: hsl(var(--primary)) !important;
+}
+
+[data-sonner-toast].seentube-toast-error {
+  border-color: hsl(11 81% 90%) !important;
+  background: hsl(11 81% 97%) !important;
+}
+
+[data-sonner-toast].seentube-toast-error [data-icon] {
+  color: hsl(var(--destructive)) !important;
+}
+
+[data-sonner-toast].seentube-toast-info [data-icon] {
+  color: hsl(var(--primary)) !important;
+}
+
+[data-sonner-toast] [data-close-button].seentube-toast-close,
+[data-sonner-toast] [data-close-button] {
+  background: #ffffff !important;
+  border: 1px solid hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+  left: auto !important;
+  right: -0.4rem !important;
+  top: -0.4rem !important;
+  transform: none !important;
+}

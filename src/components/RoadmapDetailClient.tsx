@@ -39,6 +39,7 @@ import RoadmapStepList from "@/components/RoadmapStepList";
 import DeletePasswordDialog from "@/components/DeletePasswordDialog";
 import SecurityAnswerDialog from "@/components/SecurityAnswerDialog";
 import { Button } from "@/components/ui/button";
+import { redirectNeedsUsername, redirectSignedOut, waitForAuthUser } from "@/lib/auth";
 
 type DetailState = "loading" | "ready" | "not-found" | "forbidden" | "error";
 
@@ -55,15 +56,19 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [reorderMode, setReorderMode] = useState(false);
   const [draftSteps, setDraftSteps] = useState<RoadmapStep[]>([]);
   const [savingOrder, setSavingOrder] = useState(false);
 
   useEffect(() => {
     let active = true;
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        window.location.replace("/");
+    const unsubscribe = onAuthStateChanged(auth, async () => {
+      const signedInUser = await waitForAuthUser();
+      if (!active) return;
+
+      if (!signedInUser) {
+        redirectSignedOut("/");
         return;
       }
       if (!roadmapId) {
@@ -71,11 +76,11 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
         return;
       }
 
-      setUser(currentUser);
+      setUser(signedInUser);
       try {
-        const profileSnapshot = await getDoc(doc(db, "users", currentUser.uid));
+        const profileSnapshot = await getDoc(doc(db, "users", signedInUser.uid));
         if (!profileSnapshot.data()?.username) {
-          window.location.replace("/onboarding");
+          redirectNeedsUsername();
           return;
         }
 
@@ -92,17 +97,17 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
           return;
         }
 
-        if (loadedRoadmap.ownerId !== currentUser.uid) {
+        if (loadedRoadmap.ownerId !== signedInUser.uid) {
           if (loadedRoadmap.visibility !== "public") {
             setState("forbidden");
             return;
           }
-          const connectionSnapshot = await getDoc(getConnectionRef(currentUser.uid, loadedRoadmap.ownerId));
+          const connectionSnapshot = await getDoc(getConnectionRef(signedInUser.uid, loadedRoadmap.ownerId));
           const connection = connectionSnapshot.data() as Partial<Connection> | undefined;
           if (
             !connectionSnapshot.exists()
             || connection?.status !== "accepted"
-            || !connection.participants?.includes(currentUser.uid)
+            || !connection.participants?.includes(signedInUser.uid)
             || !connection.participants.includes(loadedRoadmap.ownerId)
           ) {
             setState("forbidden");
@@ -134,6 +139,12 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
     const currentUser = auth.currentUser;
     if (!currentUser || !roadmap || roadmap.ownerId !== currentUser.uid || updatingStepId) return;
 
+    const currentStep = roadmap.steps.find((step) => step.id === stepId);
+    if (currentStep?.status === "completed" && status !== "completed") {
+      toast.error("Completed videos are locked and cannot change status.");
+      return;
+    }
+
     setUpdatingStepId(stepId);
     try {
       const roadmapRef = doc(db, "roadmaps", roadmap.id);
@@ -144,8 +155,12 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
         if (!currentRoadmap || currentRoadmap.ownerId !== currentUser.uid) {
           throw new Error("Only the roadmap owner can update progress.");
         }
-        if (!currentRoadmap.steps.some((step) => step.id === stepId)) {
+        const existingStep = currentRoadmap.steps.find((step) => step.id === stepId);
+        if (!existingStep) {
           throw new Error("This video step no longer exists.");
+        }
+        if (existingStep.status === "completed" && status !== "completed") {
+          throw new Error("Completed videos are locked and cannot change status.");
         }
         const steps = currentRoadmap.steps.map((step) => (
           step.id === stepId ? { ...step, status } : step
@@ -260,6 +275,12 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
     await verifyDeletionAnswer(answer);
     setDraftSteps(roadmap ? roadmap.steps.map((step) => ({ ...step })) : []);
     setReorderMode(true);
+  };
+
+  const confirmEditAccess = async (answer: string) => {
+    await verifyDeletionAnswer(answer);
+    if (!roadmap) return;
+    window.location.assign(`/roadmaps?edit=${encodeURIComponent(roadmap.id)}`);
   };
 
   const moveDraftStep = (index: number, direction: -1 | 1) => {
@@ -452,8 +473,8 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
       <section className="sticky bottom-20 z-10 rounded-lg border border-border bg-white p-3 shadow-lg lg:static lg:shadow-none" aria-label="Roadmap actions">
         {isOwner ? (
           <div className="grid gap-2 sm:grid-cols-2">
-            <Button asChild size="lg">
-              <a href={`/roadmaps?edit=${encodeURIComponent(roadmap.id)}`}><Pencil /> Edit & add videos</a>
+            <Button type="button" size="lg" onClick={() => setEditDialogOpen(true)}>
+              <Pencil /> Edit & add videos
             </Button>
             <Button
               type="button"
@@ -496,11 +517,21 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
       <SecurityAnswerDialog
         open={orderDialogOpen}
         title="Change video sequence"
-        description="Enter your security answer to unlock reordering for this roadmap."
+        description="Enter your One Password answer to unlock reordering for this roadmap."
         confirmLabel="Unlock reordering"
         pendingLabel="Verifying…"
         onOpenChange={setOrderDialogOpen}
         onConfirm={confirmReorderAccess}
+      />
+
+      <SecurityAnswerDialog
+        open={editDialogOpen}
+        title="Edit roadmap"
+        description="Enter your One Password answer to edit videos in this roadmap."
+        confirmLabel="Continue to edit"
+        pendingLabel="Verifying…"
+        onOpenChange={setEditDialogOpen}
+        onConfirm={confirmEditAccess}
       />
     </div>
   );

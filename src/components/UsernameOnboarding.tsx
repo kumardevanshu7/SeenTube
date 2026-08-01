@@ -7,6 +7,7 @@ import {
   normalizeUsername,
   validateUsername,
 } from "@/lib/users";
+import { clearSignedIn, markSignedIn, redirectSignedOut, waitForAuthUser } from "@/lib/auth";
 
 type ScreenState = "checking" | "ready" | "error";
 
@@ -36,21 +37,25 @@ export default function UsernameOnboarding() {
 
   useEffect(() => {
     let active = true;
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        window.location.replace("/login");
+    const unsubscribe = onAuthStateChanged(auth, async () => {
+      const signedInUser = await waitForAuthUser();
+      if (!active) return;
+
+      if (!signedInUser) {
+        redirectSignedOut("/login");
         return;
       }
 
-      setUser(currentUser);
+      markSignedIn();
+      setUser(signedInUser);
       try {
-        const profile = await getUserProfile(currentUser.uid);
+        const profile = await getUserProfile(signedInUser.uid);
         if (!active) return;
         if (profile?.username || profile?.usernameNormalized) {
           window.location.replace("/dashboard");
           return;
         }
-        setUsername(buildSuggestion(currentUser));
+        setUsername(buildSuggestion(signedInUser));
         setScreen("ready");
       } catch (error) {
         console.error("Unable to check username profile:", error);
@@ -59,7 +64,6 @@ export default function UsernameOnboarding() {
         setScreen("error");
       }
     });
-
     return () => {
       active = false;
       unsubscribe();
@@ -95,6 +99,7 @@ export default function UsernameOnboarding() {
   const handleSignOut = async () => {
     if (submitting) return;
     try {
+      clearSignedIn();
       await signOut(auth);
     } finally {
       window.location.assign("/login");

@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
-import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import VideoGrid from "./VideoGrid";
 import type { VideoCardData } from "./VideoCard";
 import { getCached, setCached } from "@/lib/data-cache";
-import { getUserProfile } from "@/lib/users";
+import { redirectNeedsUsername, redirectSignedOut, watchAuth } from "@/lib/auth";
 
 const cacheKey = (uid: string) => `videos:list:${uid}`;
 
@@ -15,27 +14,20 @@ export default function VideosClient() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      if (!u) {
-        window.location.href = "/";
-        return;
-      }
+    return watchAuth({
+      onSignedOut: () => redirectSignedOut("/"),
+      onNeedsUsername: () => redirectNeedsUsername(),
+      onReady: async (u) => {
+        setUser(u);
 
-      const profile = await getUserProfile(u.uid);
-      if (!profile?.username) {
-        window.location.href = "/onboarding";
-        return;
-      }
-      setUser(u);
-
-      const entry = getCached<VideoCardData[]>(cacheKey(u.uid));
-      if (entry) {
-        setVideos(entry.data);
-        setLoading(false);
-      }
-      if (!entry?.isFresh) await fetchData(u.uid);
+        const entry = getCached<VideoCardData[]>(cacheKey(u.uid));
+        if (entry) {
+          setVideos(entry.data);
+          setLoading(false);
+        }
+        if (!entry?.isFresh) await fetchData(u.uid);
+      },
     });
-    return () => unsubscribe();
   }, []);
 
   const fetchData = async (uid: string) => {

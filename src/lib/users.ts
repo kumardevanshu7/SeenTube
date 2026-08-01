@@ -11,6 +11,8 @@ export interface UserProfile {
   usernameNormalized: string;
   createdAt: number;
   updatedAt: number;
+  customCategories?: string[];
+  removedCategories?: string[];
 }
 
 const USERNAME_PATTERN = /^[a-z0-9_]{3,24}$/;

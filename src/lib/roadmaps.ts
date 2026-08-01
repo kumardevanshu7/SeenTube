@@ -36,6 +36,13 @@ export const makeStepId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+/** Always build watch links from youtubeId — never trust freeform stored URLs. */
+export const youtubeWatchUrl = (youtubeId: string) =>
+  `https://www.youtube.com/watch?v=${encodeURIComponent(youtubeId)}`;
+
+export const youtubeThumbnailUrl = (youtubeId: string) =>
+  `https://img.youtube.com/vi/${encodeURIComponent(youtubeId)}/hqdefault.jpg`;
+
 export const normalizeStepStatus = (value: unknown): RoadmapStepStatus =>
   value === "completed" || value === "not_completed" ? value : "pending";
 export const normalizeRoadmap = (

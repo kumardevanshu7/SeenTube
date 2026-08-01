@@ -123,8 +123,8 @@ export default function SecurityAnswerDialog({
 
           {questionState.status === "not-configured" && (
             <div className="rounded-lg border border-border bg-secondary p-4 text-sm">
-              <p className="font-semibold text-foreground">Set up security first</p>
-              <p className="mt-1 text-muted-foreground">Add your security question and answer in Settings before using this action.</p>
+              <p className="font-semibold text-foreground">Set up One Password first</p>
+              <p className="mt-1 text-muted-foreground">Add your question and answer in Settings before using this action.</p>
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                 <Button asChild><a href="/settings"><ShieldQuestion /> Open Settings</a></Button>
@@ -147,7 +147,7 @@ export default function SecurityAnswerDialog({
               <div className="mb-3 rounded-lg border border-border bg-secondary p-3">
                 <div className="flex items-center gap-2 text-primary">
                   <HelpCircle className="h-4 w-4" />
-                  <span className="text-xs font-bold uppercase tracking-wide">Security question</span>
+                  <span className="text-xs font-bold uppercase tracking-wide">One Password</span>
                 </div>
                 <p className="mt-1.5 font-semibold text-foreground">{questionState.question}</p>
               </div>

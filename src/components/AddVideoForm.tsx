@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Youtube,
+  Pencil,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -23,6 +24,7 @@ import {
 } from "./ui/select";
 import { cn, extractYouTubeId } from "@/lib/utils";
 import { CATEGORIES } from "@/lib/constants";
+import { getUserCategoryPrefs, resolveCategories } from "@/lib/categories";
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
@@ -32,9 +34,9 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
 import { invalidateCache } from "@/lib/data-cache";
-import { getUserProfile } from "@/lib/users";
+import { redirectNeedsUsername, redirectSignedOut, watchAuth } from "@/lib/auth";
+import EditCategoriesDialog from "./EditCategoriesDialog";
 
 interface YoutubeMeta {
   title: string;
@@ -66,23 +68,25 @@ export default function AddVideoForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [categories, setCategories] = useState<string[]>([...CATEGORIES]);
+  const [editCategoriesOpen, setEditCategoriesOpen] = useState(false);
 
   // Auth check
   const [authChecked, setAuthChecked] = useState(false);
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      if (!u) {
-        window.location.href = "/";
-        return;
-      }
-      const profile = await getUserProfile(u.uid);
-      if (!profile?.username) {
-        window.location.href = "/onboarding";
-        return;
-      }
-      setAuthChecked(true);
+    return watchAuth({
+      onSignedOut: () => redirectSignedOut("/"),
+      onNeedsUsername: () => redirectNeedsUsername(),
+      onReady: async (u) => {
+        try {
+          const prefs = await getUserCategoryPrefs(u.uid);
+          setCategories(resolveCategories(prefs));
+        } catch {
+          setCategories([...CATEGORIES]);
+        }
+        setAuthChecked(true);
+      },
     });
-    return () => unsubscribe();
   }, []);
 
   // Auto-fetch metadata and check whether this account already added the video.
@@ -105,16 +109,17 @@ export default function AddVideoForm() {
     debounceRef.current = setTimeout(async () => {
       setIsFetching(true);
       try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) throw new Error("Please sign in again.");
+        const token = await currentUser.getIdToken();
         const res = await fetch(
-          `/api/youtube-meta?url=${encodeURIComponent(url)}`
+          `/api/youtube-meta?url=${encodeURIComponent(url)}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         const data: YoutubeMeta & { error?: string } = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to fetch");
 
-        const currentUser = auth.currentUser;
-        const isDuplicate = currentUser
-          ? await videoAlreadyAddedByUser(data.youtubeId, currentUser.uid)
-          : false;
+        const isDuplicate = await videoAlreadyAddedByUser(data.youtubeId, currentUser.uid);
 
         if (cancelled) return;
         setMeta(data);
@@ -379,16 +384,32 @@ export default function AddVideoForm() {
               <label className="text-sm font-medium text-foreground">
                 Category <span className="text-destructive">*</span>
               </label>
-              <Select value={category} onValueChange={setCategory} required>
+              <Select
+                value={category}
+                onValueChange={(value) => {
+                  if (value === "__edit__") {
+                    setEditCategoriesOpen(true);
+                    return;
+                  }
+                  setCategory(value);
+                }}
+                required
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((cat) => (
+                  {categories.map((cat) => (
                     <SelectItem key={cat} value={cat}>
                       {cat}
                     </SelectItem>
                   ))}
+                  <SelectItem value="__edit__" className="text-primary focus:text-primary">
+                    <span className="inline-flex items-center gap-2">
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit categories
+                    </span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -494,6 +515,15 @@ export default function AddVideoForm() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <EditCategoriesDialog
+        open={editCategoriesOpen}
+        onOpenChange={setEditCategoriesOpen}
+        onSaved={(next) => {
+          setCategories(next);
+          if (category && !next.includes(category)) setCategory("");
+        }}
+      />
     </form>
   );
 }

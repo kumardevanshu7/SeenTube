@@ -28,6 +28,7 @@ import {
   UserMinus,
   UserPlus,
   Users,
+  UsersRound,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -41,8 +42,12 @@ import {
   type Connection,
 } from "@/lib/connections";
 import { normalizeUsername } from "@/lib/users";
+import { redirectNeedsUsername, redirectSignedOut, waitForAuthUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
+export type GuildMode = "guild" | "videos";
 
 type MemberProfile = {
   uid: string;
@@ -221,7 +226,42 @@ function ConnectionPerson({ connection }: { connection: ConnectionView }) {
   );
 }
 
-export default function GuildVideosClient() {
+function GuildTabs({ mode }: { mode: GuildMode }) {
+  return (
+    <div className="mb-2 flex flex-wrap gap-2" role="tablist" aria-label="Guild pages">
+      <a
+        href="/guild"
+        role="tab"
+        aria-selected={mode === "guild"}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors",
+          mode === "guild"
+            ? "border-primary bg-primary text-white"
+            : "border-border bg-white text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <UsersRound className="h-3.5 w-3.5" />
+        Guild Videos
+      </a>
+      <a
+        href="/guild/videos"
+        role="tab"
+        aria-selected={mode === "videos"}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors",
+          mode === "videos"
+            ? "border-primary bg-primary text-white"
+            : "border-border bg-white text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <Library className="h-3.5 w-3.5" />
+        Connection videos
+      </a>
+    </div>
+  );
+}
+
+export default function GuildVideosClient({ mode = "guild" }: { mode?: GuildMode }) {
   const [user, setUser] = useState<User | null>(null);
   const [connections, setConnections] = useState<ConnectionView[]>([]);
   const [videos, setVideos] = useState<GuildVideo[]>([]);
@@ -245,26 +285,29 @@ export default function GuildVideosClient() {
     let refreshVersion = 0;
     let unsubscribeConnections = () => {};
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async () => {
       unsubscribeConnections();
       refreshVersion += 1;
 
-      if (!currentUser) {
-        window.location.replace("/");
+      const signedInUser = await waitForAuthUser();
+      if (!active) return;
+
+      if (!signedInUser) {
+        redirectSignedOut("/");
         return;
       }
 
       try {
-        const profileSnapshot = await getDoc(doc(db, "users", currentUser.uid));
+        const profileSnapshot = await getDoc(doc(db, "users", signedInUser.uid));
         if (!active) return;
         if (!profileSnapshot.data()?.username) {
-          window.location.replace("/onboarding");
+          redirectNeedsUsername();
           return;
         }
 
-        setUser(currentUser);
+        setUser(signedInUser);
         unsubscribeConnections = subscribeToUserConnectionDocuments(
-          currentUser.uid,
+          signedInUser.uid,
           (connectionDocuments) => {
             const version = ++refreshVersion;
             void (async () => {
@@ -278,7 +321,7 @@ export default function GuildVideosClient() {
                     !Array.isArray(participants)
                     || participants.length !== 2
                     || !participants.every((uid) => typeof uid === "string")
-                    || !participants.includes(currentUser.uid)
+                    || !participants.includes(signedInUser.uid)
                     || typeof data.requesterId !== "string"
                     || typeof data.recipientId !== "string"
                     || !validStatus
@@ -296,7 +339,7 @@ export default function GuildVideosClient() {
                 });
 
                 const otherUid = (connection: Connection) =>
-                  connection.participants.find((uid) => uid !== currentUser.uid) || "";
+                  connection.participants.find((uid) => uid !== signedInUser.uid) || "";
                 const involvedIds = Array.from(new Set(rawConnections.map(otherUid).filter(Boolean)));
                 const acceptedIds = Array.from(new Set(
                   rawConnections
@@ -305,15 +348,18 @@ export default function GuildVideosClient() {
                     .filter(Boolean),
                 ));
 
-                const ownVideosPromise = getDocs(query(
-                  collection(db, "videos"),
-                  where("addedBy", "==", currentUser.uid),
-                ));
+                const loadVideos = mode === "videos";
+                const ownVideosPromise = loadVideos
+                  ? getDocs(query(
+                    collection(db, "videos"),
+                    where("addedBy", "==", signedInUser.uid),
+                  ))
+                  : Promise.resolve(null);
                 const profilesPromise = Promise.all(involvedIds.map(async (uid) => ({
                   uid,
                   snapshot: await getDoc(doc(db, "users", uid)),
                 })));
-                const connectedVideoSnapshotsPromise = acceptedIds.length > 0
+                const connectedVideoSnapshotsPromise = loadVideos && acceptedIds.length > 0
                   ? Promise.all(acceptedIds.map((uid) => getDocs(query(
                       collection(db, "videos"),
                       where("addedBy", "==", uid),
@@ -345,6 +391,13 @@ export default function GuildVideosClient() {
                 });
                 views.sort((a, b) => b.updatedAt - a.updatedAt);
 
+                setConnections(views);
+
+                if (!loadVideos || !ownVideoSnapshot) {
+                  setVideos([]);
+                  return;
+                }
+
                 const ownYoutubeIds = new Set<string>();
                 ownVideoSnapshot.docs.forEach((videoSnapshot) => {
                   const videoId = videoSnapshot.data().videoId;
@@ -363,7 +416,6 @@ export default function GuildVideosClient() {
                 });
                 guildVideos.sort((a, b) => timestampValue(b.createdAt) - timestampValue(a.createdAt));
 
-                setConnections(views);
                 setVideos(guildVideos);
                 setImportStates(Object.fromEntries(
                   Array.from(ownYoutubeIds, (youtubeId) => [youtubeId, "existing" as const]),
@@ -406,7 +458,7 @@ export default function GuildVideosClient() {
       unsubscribeConnections();
       unsubscribeAuth();
     };
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     const prefix = normalizeUsername(usernameInput);
@@ -441,25 +493,15 @@ export default function GuildVideosClient() {
             .filter((match): match is { uid: string; username: string } => (
               typeof match.uid === "string" && Boolean(match.uid) && match.uid !== user.uid
             ));
-          const profileSnapshots = await Promise.all(matches.map(async (match) => ({
-            match,
-            snapshot: await getDoc(doc(db, "users", match.uid)),
-          })));
           if (cancelled) return;
 
-          setUsernameSuggestions(profileSnapshots.flatMap(({ match, snapshot }) => {
-            const profile = snapshot.data();
-            if (!snapshot.exists()) return [];
-            const name = typeof profile?.name === "string" && profile.name.trim()
-              ? profile.name.trim()
-              : match.username;
-            return [{
-              uid: match.uid,
-              username: match.username,
-              name,
-              image: typeof profile?.image === "string" && profile.image ? profile.image : null,
-            }];
-          }));
+          // Profiles are readable only for self/connections — suggestions use usernames only.
+          setUsernameSuggestions(matches.map((match) => ({
+            uid: match.uid,
+            username: match.username,
+            name: match.username,
+            image: null,
+          })));
         } catch (error) {
           if (cancelled) return;
           console.error("Username suggestions error:", error);
@@ -654,7 +696,7 @@ export default function GuildVideosClient() {
       toast.success(created ? "Video imported to your collection" : "Already in your collection");
     } catch (error) {
       console.error("Guild video import error:", error);
-      toast.error("Could not import this video. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Could not import this video. Please try again.");
     } finally {
       setImportingId(null);
     }
@@ -683,18 +725,28 @@ export default function GuildVideosClient() {
   return (
     <div className="mx-auto max-w-7xl space-y-7 px-4 py-8 sm:px-6">
       <header>
+        <GuildTabs mode={mode} />
         <div className="mb-2 flex items-center gap-2 text-primary">
           <Users className="h-5 w-5" />
-          <span className="text-xs font-bold uppercase tracking-widest">Shared by connections</span>
+          <span className="text-xs font-bold uppercase tracking-widest">
+            {mode === "guild" ? "Manage connections" : "Shared by connections"}
+          </span>
         </div>
         <h1 className="text-3xl font-bold sm:text-4xl">
-          Guild <span className="text-primary">Videos</span>
+          {mode === "guild" ? (
+            <>Guild <span className="text-primary">Videos</span></>
+          ) : (
+            <>Connection <span className="text-primary">videos</span></>
+          )}
         </h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
-          Connect with SeenTube members, discover their public videos, and import favorites into your collection.
+          {mode === "guild"
+            ? "Connect with SeenTube members by exact @username, then browse what they share."
+            : "Discover public videos from your connections and import favorites into your collection."}
         </p>
       </header>
 
+      {mode === "guild" && (
       <section className="card space-y-5 rounded-xl p-4 sm:p-6" aria-labelledby="connections-heading">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
@@ -925,7 +977,9 @@ export default function GuildVideosClient() {
           </div>
         </div>
       </section>
+      )}
 
+      {mode === "videos" && (
       <section className="space-y-5" aria-labelledby="guild-library-heading">
         <div>
           <h2 id="guild-library-heading" className="text-2xl font-bold">Connection videos</h2>
@@ -941,6 +995,9 @@ export default function GuildVideosClient() {
             <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
               Send a connection request by exact @username, or accept an incoming request first.
             </p>
+            <Button asChild className="mt-4">
+              <a href="/guild"><UserPlus /> Go to Guild Videos</a>
+            </Button>
           </div>
         ) : (
           <>
@@ -1009,6 +1066,7 @@ export default function GuildVideosClient() {
           </>
         )}
       </section>
+      )}
     </div>
   );
 }

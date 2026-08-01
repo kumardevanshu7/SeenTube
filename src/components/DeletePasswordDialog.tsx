@@ -57,7 +57,7 @@ export default function DeletePasswordDialog({
         if (!active) return;
         setQuestionState({
           status: "error",
-          message: caughtError instanceof Error ? caughtError.message : "Could not load your security question.",
+          message: caughtError instanceof Error ? caughtError.message : "Could not load your One Password question.",
         });
       }
     })();
@@ -111,14 +111,14 @@ export default function DeletePasswordDialog({
 
           {questionState.status === "loading" && (
             <div className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-4 text-sm text-muted-foreground" role="status">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading your security question…
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading your One Password…
             </div>
           )}
 
           {questionState.status === "not-configured" && (
             <div className="rounded-lg border border-border bg-secondary p-4 text-sm">
-              <p className="font-semibold text-foreground">Set up deletion security first</p>
-              <p className="mt-1 text-muted-foreground">Add your security question and answer in Settings before deleting anything.</p>
+              <p className="font-semibold text-foreground">Set up One Password first</p>
+              <p className="mt-1 text-muted-foreground">Add your question and answer in Settings before deleting anything.</p>
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                 <Button asChild><a href="/settings"><ShieldQuestion /> Open Settings</a></Button>
@@ -141,7 +141,7 @@ export default function DeletePasswordDialog({
               <div className="mb-3 rounded-lg border border-border bg-secondary p-3">
                 <div className="flex items-center gap-2 text-primary">
                   <HelpCircle className="h-4 w-4" />
-                  <span className="text-xs font-bold uppercase tracking-wide">Security question</span>
+                  <span className="text-xs font-bold uppercase tracking-wide">One Password</span>
                 </div>
                 <p className="mt-1.5 font-semibold text-foreground">{questionState.question}</p>
               </div>

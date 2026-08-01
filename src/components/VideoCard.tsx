@@ -138,6 +138,10 @@ export default function VideoCard({
 
   const handleStatusChange = async (newStatus: VideoStatusEnum) => {
     if (newStatus === myStatus || isUpdating) return;
+    if (myStatus === "watched") {
+      toast.error("Fully watched videos are locked and cannot change status.");
+      return;
+    }
     setIsUpdating(true);
     const prevStatus = myStatus;
 
@@ -172,8 +176,8 @@ export default function VideoCard({
           { merge: true }
         );
       } else {
-        // Create new status doc
-        const newDocId = crypto.randomUUID();
+        // Deterministic ID matches Add Video / Guild import.
+        const newDocId = `${video.id}_${user.uid}`;
         await setDoc(doc(db, "videoStatuses", newDocId), {
           videoId: video.id,
           userId: user.uid,
@@ -222,11 +226,11 @@ export default function VideoCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10, scale: 0.95 }}
       transition={{ delay: index * 0.05, duration: 0.35, ease: "easeOut" }}
-      className={cn("card rounded-lg overflow-hidden group", `card-tint-${myStatus}`)}
+      className={cn("card flex h-full flex-col rounded-lg overflow-hidden group", `card-tint-${myStatus}`)}
       layout
     >
       {/* Thumbnail */}
-      <div className="relative aspect-video overflow-hidden bg-muted">
+      <div className="relative aspect-video overflow-hidden bg-muted shrink-0">
         <img
           src={thumbnailSrc}
           alt={video.title}
@@ -263,7 +267,7 @@ export default function VideoCard({
       </div>
 
       {/* Content */}
-      <div className={cn("flex flex-col gap-3", compact ? "p-3 sm:p-4 sm:gap-3 gap-2" : "p-4")}>
+      <div className={cn("flex flex-1 flex-col gap-3", compact ? "p-3 sm:p-4 sm:gap-3 gap-2" : "p-4")}>
         {/* Header row */}
         <div className="flex items-start justify-between gap-1.5">
           <div className="flex-1 min-w-0">
@@ -277,10 +281,10 @@ export default function VideoCard({
             >
               {video.category}
             </span>
-            {/* Title */}
+            {/* Title — reserve 2 lines so card bodies stay even */}
             <h3
               className={cn(
-                "font-display font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-primary transition-colors",
+                "font-display font-semibold leading-snug text-foreground line-clamp-2 min-h-[2.5em] group-hover:text-primary transition-colors",
                 compact ? "text-xs sm:text-sm" : "text-sm"
               )}
             >
@@ -304,19 +308,26 @@ export default function VideoCard({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuLabel>My Status</DropdownMenuLabel>
+              {myStatus === "watched" && (
+                <p className="px-2 pb-2 text-xs text-muted-foreground">
+                  Fully watched — status is locked.
+                </p>
+              )}
               {statusOptions.map(({ value, label, icon: Icon, description, activeClass, iconActiveClass }) => {
                 const isActive = myStatus === value;
+                const isLocked = myStatus === "watched" && !isActive;
                 return (
                   <DropdownMenuItem
                     key={value}
                     onClick={() => handleStatusChange(value)}
-                    className={cn("gap-3", isActive && activeClass)}
+                    disabled={isLocked}
+                    className={cn("gap-3", isActive && activeClass, isLocked && "opacity-50")}
                   >
                     <Icon className={cn("w-4 h-4 shrink-0", isActive && iconActiveClass)} />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium">{label}</div>
                       <div className={cn("text-xs", isActive ? "opacity-70" : "text-muted-foreground")}>
-                        {description}
+                        {isLocked ? "Locked" : description}
                       </div>
                     </div>
                     {isActive && (
@@ -341,86 +352,95 @@ export default function VideoCard({
           </DropdownMenu>
         </div>
 
-        {/* Description */}
-        {video.description && (
-          <p className={cn("text-xs text-muted-foreground line-clamp-2 leading-relaxed", compact && "hidden sm:block")}>
-            {video.description}
-          </p>
-        )}
+        {/* Description — always reserve height so labels align across cards */}
+        <p
+          className={cn(
+            "text-xs text-muted-foreground line-clamp-2 min-h-[2.5em] leading-relaxed",
+            compact && "hidden sm:block",
+            !video.description && "invisible",
+          )}
+        >
+          {video.description || "\u00A0"}
+        </p>
 
-        {/* Tags */}
-        {video.tags && video.tags.length > 0 && (
-          <div className={cn("flex flex-wrap gap-1.5", compact && "hidden sm:flex")}>
-            {video.tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 border border-border/50 rounded-full px-2 py-0.5"
-              >
-                <Tag className="w-2.5 h-2.5" />
-                {tag}
+        {/* Tags — always reserve one row so chips align across cards */}
+        <div
+          className={cn(
+            "flex min-h-6 flex-wrap content-start gap-1.5",
+            compact && "hidden sm:flex",
+          )}
+        >
+          {(video.tags?.length ? video.tags : []).slice(0, 2).map((tag, tagIndex) => (
+            <span
+              key={`${tag}-${tagIndex}`}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 border border-border/50 rounded-full px-2 py-0.5"
+            >
+              <Tag className="w-2.5 h-2.5" />
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        {/* Footer always sits on the card bottom across the grid row */}
+        <div className={cn("mt-auto flex flex-col gap-3 pt-1", compact && "gap-1.5 sm:gap-3")}>
+          <div className="h-px bg-border/40" />
+
+          {/* Status section */}
+          <div className={cn("flex flex-col gap-2", compact && "gap-1.5 sm:gap-2")}>
+            {/* My Status */}
+            <div className="flex items-center justify-between gap-2">
+              <span className={cn("text-xs text-muted-foreground flex items-center gap-1.5 shrink-0", compact && "text-[11px] sm:text-xs sm:gap-1.5 gap-1")}>
+                <User className="w-3 h-3" />
+                {compact ? (
+                  <>
+                    <span className="hidden sm:inline">My status</span>
+                    <span className="sm:hidden">Status</span>
+                  </>
+                ) : (
+                  "My status"
+                )}
               </span>
-            ))}
-          </div>
-        )}
-
-        {/* Divider */}
-        <div className="h-px bg-border/40" />
-
-        {/* Status section */}
-        <div className={cn("flex flex-col gap-2", compact && "gap-1.5 sm:gap-2")}>
-          {/* My Status */}
-          <div className="flex items-center justify-between gap-2">
-            <span className={cn("text-xs text-muted-foreground flex items-center gap-1.5 shrink-0", compact && "text-[11px] sm:text-xs sm:gap-1.5 gap-1")}>
-              <User className="w-3 h-3" />
               {compact ? (
                 <>
-                  <span className="hidden sm:inline">My status</span>
-                  <span className="sm:hidden">Status</span>
+                  <StatusBadge status={myStatus} size="xs" short className="sm:hidden" />
+                  <StatusBadge status={myStatus} size="sm" className="hidden sm:inline-flex" />
                 </>
               ) : (
-                "My status"
+                <StatusBadge status={myStatus} size="sm" />
               )}
-            </span>
-            {compact ? (
-              <>
-                <StatusBadge status={myStatus} size="xs" short className="sm:hidden" />
-                <StatusBadge status={myStatus} size="sm" className="hidden sm:inline-flex" />
-              </>
-            ) : (
-              <StatusBadge status={myStatus} size="sm" />
+            </div>
+
+            {/* Friend Status - only show if friendId is different from current user */}
+            {video.friendStatus && video.friendName && video.friendId !== currentUserId && (
+              <div className={cn("rounded-lg bg-muted/30 border border-border/40 px-3 py-2", compact && "hidden sm:block")}>
+                <div className="flex items-center gap-2 mb-1">
+                  {video.friendAvatar ? (
+                    <img
+                      src={video.friendAvatar}
+                      alt={video.friendName}
+                      className="w-4 h-4 rounded-full"
+                    />
+                  ) : (
+                    <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
+                      <span className="text-[8px] font-bold text-primary">
+                        {video.friendName[0]}
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {getFriendStatusMessage(video.friendName, video.friendStatus)}
+                  </p>
+                </div>
+                <StatusBadge status={video.friendStatus} size="sm" />
+              </div>
             )}
           </div>
 
-          {/* Friend Status - only show if friendId is different from current user */}
-          {video.friendStatus && video.friendName && video.friendId !== currentUserId && (
-            <div className={cn("rounded-lg bg-muted/30 border border-border/40 px-3 py-2", compact && "hidden sm:block")}>
-              <div className="flex items-center gap-2 mb-1">
-                {video.friendAvatar ? (
-                  <img
-                    src={video.friendAvatar}
-                    alt={video.friendName}
-                    className="w-4 h-4 rounded-full"
-                  />
-                ) : (
-                  <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
-                    <span className="text-[8px] font-bold text-primary">
-                      {video.friendName[0]}
-                    </span>
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  {getFriendStatusMessage(video.friendName, video.friendStatus)}
-                </p>
-              </div>
-              <StatusBadge status={video.friendStatus} size="sm" />
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className={cn("flex items-center gap-1.5 text-xs text-muted-foreground", compact && "text-[11px] sm:text-xs")}>
-          <Calendar className="w-3 h-3 shrink-0" />
-          {formatRelativeDate(video.createdAt)}
+          {/* Date */}
+          <div className={cn("flex items-center gap-1.5 text-xs text-muted-foreground", compact && "text-[11px] sm:text-xs")}>
+            <Calendar className="w-3 h-3 shrink-0" />
+            {formatRelativeDate(video.createdAt)}
+          </div>
         </div>
       </div>
       </motion.div>

@@ -2,9 +2,10 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, SlidersHorizontal, X, Rows3, Grid2x2 } from "lucide-react";
+import { Pencil, Search, SlidersHorizontal, X, Rows3, Grid2x2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import VideoCard, { type VideoCardData } from "./VideoCard";
+import EditCategoriesDialog from "./EditCategoriesDialog";
 import { Input } from "./ui/input";
 import {
   Select,
@@ -15,6 +16,7 @@ import {
 } from "./ui/select";
 import { Button } from "./ui/button";
 import { CATEGORIES, type VideoStatusEnum } from "@/lib/constants";
+import { getUserCategoryPrefs, resolveCategories } from "@/lib/categories";
 
 interface VideoGridProps {
   initialVideos: VideoCardData[];
@@ -35,11 +37,33 @@ export default function VideoGrid({
   const [showFilters, setShowFilters] = useState(false);
   // Mobile-only column toggle: 1 or 2 columns. Persisted so the choice sticks.
   const [mobileCols, setMobileCols] = useState<1 | 2>(2);
+  const [categories, setCategories] = useState<string[]>([...CATEGORIES]);
+  const [editCategoriesOpen, setEditCategoriesOpen] = useState(false);
+
+  useEffect(() => {
+    setVideos(initialVideos);
+  }, [initialVideos]);
 
   useEffect(() => {
     const saved = localStorage.getItem("videoGrid:mobileCols");
     if (saved === "1" || saved === "2") setMobileCols(Number(saved) as 1 | 2);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const prefs = await getUserCategoryPrefs(currentUserId);
+        if (!active) return;
+        setCategories(resolveCategories(prefs));
+      } catch {
+        if (active) setCategories([...CATEGORIES]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [currentUserId]);
 
   const toggleMobileCols = () => {
     const next = mobileCols === 1 ? 2 : 1;
@@ -148,17 +172,32 @@ export default function VideoGrid({
               className="overflow-hidden"
             >
               <div className="flex flex-wrap gap-3 pt-1">
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-[160px]">
+                <Select
+                  value={categoryFilter}
+                  onValueChange={(value) => {
+                    if (value === "__edit__") {
+                      setEditCategoriesOpen(true);
+                      return;
+                    }
+                    setCategoryFilter(value);
+                  }}
+                >
+                  <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    {CATEGORIES.map((cat) => (
+                    {categories.map((cat) => (
                       <SelectItem key={cat} value={cat}>
                         {cat}
                       </SelectItem>
                     ))}
+                    <SelectItem value="__edit__" className="text-primary focus:text-primary">
+                      <span className="inline-flex items-center gap-2">
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit categories
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -273,7 +312,7 @@ export default function VideoGrid({
         <motion.div
           layout
           className={cn(
-            "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+            "grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
             mobileCols === 1 ? "grid-cols-1" : "grid-cols-2"
           )}
         >
@@ -292,6 +331,17 @@ export default function VideoGrid({
           </AnimatePresence>
         </motion.div>
       )}
+
+      <EditCategoriesDialog
+        open={editCategoriesOpen}
+        onOpenChange={setEditCategoriesOpen}
+        onSaved={(next) => {
+          setCategories(next);
+          if (categoryFilter !== "all" && !next.includes(categoryFilter)) {
+            setCategoryFilter("all");
+          }
+        }}
+      />
     </div>
   );
 }

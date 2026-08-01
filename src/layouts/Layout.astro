@@ -2,7 +2,6 @@
 import "@/styles/globals.css";
 import Navbar, { BottomNav } from "@/components/Navbar";
 import { Toaster } from "sonner";
-import { ClientRouter } from "astro:transitions";
 
 interface Props {
   title?: string;
@@ -33,6 +32,7 @@ const isProduction = import.meta.env.PROD;
     <meta name="description" content={description} />
     <meta name="theme-color" content="#ffffff" />
     <meta name="application-name" content="SeenTube" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="SeenTube" />
@@ -44,7 +44,6 @@ const isProduction = import.meta.env.PROD;
     <title>{title} — SeenTube</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <ClientRouter />
     <script is:inline>
       window.addEventListener("vite:preloadError", (event) => {
         event.preventDefault();
@@ -68,10 +67,7 @@ const isProduction = import.meta.env.PROD;
   <body class="min-h-screen bg-background text-foreground antialiased">
     {
       showNav && (
-        <Navbar
-          client:load
-          transition:persist="navbar"
-        />
+        <Navbar client:load />
       )
     }
     <main class={showNav ? "pt-20 pb-20 lg:pb-0" : ""}>
@@ -79,26 +75,29 @@ const isProduction = import.meta.env.PROD;
     </main>
     {
       showNav && (
-        <BottomNav
-          client:load
-          transition:persist="bottom-nav"
-        />
+        <BottomNav client:load />
       )
     }
     <Toaster
-      client:load
-      transition:persist="toaster"
+      client:only="react"
       position="bottom-right"
       theme="light"
-      expand
+      richColors={false}
+      closeButton
+      visibleToasts={4}
+      gap={10}
+      offset={{ bottom: "5.5rem", right: "1rem" }}
+      mobileOffset={{ bottom: "5.5rem", right: "1rem" }}
       toastOptions={{
+        className: "seentube-toast",
         classNames: {
-          toast: "!rounded-lg !border !border-border !bg-white !shadow-none !font-sans !text-sm",
-          title: "!text-foreground !font-medium",
-          description: "!text-muted-foreground",
-          success: "!border-border [&_[data-icon]]:!text-primary",
-          error: "!border-[hsl(11,81%,90%)] !bg-[hsl(11,81%,97%)] [&_[data-icon]]:!text-destructive",
-          closeButton: "!bg-white !border-border !text-foreground",
+          toast: "seentube-toast group",
+          title: "seentube-toast-title",
+          description: "seentube-toast-description",
+          success: "seentube-toast-success",
+          error: "seentube-toast-error",
+          info: "seentube-toast-info",
+          closeButton: "seentube-toast-close",
         },
       }}
     />

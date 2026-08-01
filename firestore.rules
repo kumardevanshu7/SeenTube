@@ -11,29 +11,68 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function connectionDocId(a, b) {
+      return a + "__" + b;
+    }
+
+    function connectionExists(a, b) {
+      return exists(/databases/$(database)/documents/connections/$(connectionDocId(a, b)));
+    }
+
+    function connectionStatus(a, b) {
+      return get(/databases/$(database)/documents/connections/$(connectionDocId(a, b))).data.status;
+    }
+
     function hasAcceptedConnection(otherUserId) {
       return isSignedIn()
         && otherUserId is string
         && otherUserId != request.auth.uid
         && (
-          (
-            exists(/databases/$(database)/documents/connections/$(request.auth.uid + "__" + otherUserId))
-            && get(/databases/$(database)/documents/connections/$(request.auth.uid + "__" + otherUserId)).data.status == "accepted"
-          )
-          || (
-            exists(/databases/$(database)/documents/connections/$(otherUserId + "__" + request.auth.uid))
-            && get(/databases/$(database)/documents/connections/$(otherUserId + "__" + request.auth.uid)).data.status == "accepted"
-          )
+          (connectionExists(request.auth.uid, otherUserId) && connectionStatus(request.auth.uid, otherUserId) == "accepted")
+          || (connectionExists(otherUserId, request.auth.uid) && connectionStatus(otherUserId, request.auth.uid) == "accepted")
         );
+    }
+
+    function hasAnyConnection(otherUserId) {
+      return isSignedIn()
+        && otherUserId is string
+        && otherUserId != request.auth.uid
+        && (
+          (connectionExists(request.auth.uid, otherUserId)
+            && connectionStatus(request.auth.uid, otherUserId) in ["pending", "accepted"])
+          || (connectionExists(otherUserId, request.auth.uid)
+            && connectionStatus(otherUserId, request.auth.uid) in ["pending", "accepted"])
+        );
+    }
+
+    // Own deterministic video ids look like "{uid}_{youtubeId}"
+    function isOwnVideoDocId(videoDocumentId) {
+      return videoDocumentId.matches("^" + request.auth.uid + "_.*");
+    }
+
+    function isOwnStatusDocId(statusId) {
+      return statusId.matches(".*_" + request.auth.uid + "$")
+        || statusId.matches("^" + request.auth.uid + "_.*");
     }
 
     // =====================================================
     // USER PROFILES
     // =====================================================
     match /users/{userId} {
-      allow read: if isSignedIn();
+      // No open list of all users/emails. Direct gets for self or
+      // people you have a pending/accepted connection with.
+      allow get: if isSignedIn()
+        && (
+          isCurrentUser(userId)
+          || hasAnyConnection(userId)
+        );
+      allow list: if false;
+
       allow create, update: if isCurrentUser(userId)
-        && request.resource.data.id == request.auth.uid;
+        && (
+          !("id" in request.resource.data)
+          || request.resource.data.id == request.auth.uid
+        );
       allow delete: if false;
     }
 
@@ -57,8 +96,6 @@ service cloud.firestore {
     // CONNECTION REQUESTS
     // =====================================================
     match /connections/{connectionId} {
-      // App separately queries connections where the current
-      // user is the requester and where they are the recipient.
       allow read: if isSignedIn()
         && (
           resource.data.requesterId == request.auth.uid
@@ -68,6 +105,7 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.participants is list
         && request.resource.data.participants.size() == 2
+        && request.resource.data.participants[0] < request.resource.data.participants[1]
         && request.resource.data.requesterId == request.auth.uid
         && request.resource.data.recipientId is string
         && request.resource.data.recipientId != request.auth.uid
@@ -76,15 +114,12 @@ service cloud.firestore {
         && request.resource.data.status == "pending"
         && connectionId == request.resource.data.participants[0] + "__" + request.resource.data.participants[1];
 
-      // Only the request recipient can accept it.
       allow update: if isSignedIn()
         && resource.data.status == "pending"
         && resource.data.recipientId == request.auth.uid
         && request.resource.data.status == "accepted"
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "updatedAt"]);
 
-      // Requester can cancel, recipient can decline,
-      // and either participant can disconnect.
       allow delete: if isSignedIn()
         && resource.data.participants is list
         && request.auth.uid in resource.data.participants;
@@ -94,14 +129,20 @@ service cloud.firestore {
     // YOUTUBE VIDEOS
     // =====================================================
     match /videos/{videoDocumentId} {
-      // Owner can read all their own videos.
-      // Connections can only read public videos.
+      // Missing docs: only allow existence checks on YOUR destination ids
+      // (import flow). Blocks probing other users' private video ids.
       allow read: if isSignedIn()
         && (
-          resource.data.addedBy == request.auth.uid
+          (resource == null && isOwnVideoDocId(videoDocumentId))
           || (
-            resource.data.visibility == "public"
-            && hasAcceptedConnection(resource.data.addedBy)
+            resource != null
+            && (
+              resource.data.addedBy == request.auth.uid
+              || (
+                resource.data.visibility == "public"
+                && hasAcceptedConnection(resource.data.addedBy)
+              )
+            )
           )
         );
 
@@ -115,8 +156,6 @@ service cloud.firestore {
         && request.resource.data.addedBy == resource.data.addedBy
         && request.resource.data.videoId == resource.data.videoId;
 
-      // Videos are deleted through the password-protected
-      // server API. Firebase Admin bypasses client rules.
       allow delete: if false;
     }
 
@@ -125,7 +164,10 @@ service cloud.firestore {
     // =====================================================
     match /videoStatuses/{statusId} {
       allow read: if isSignedIn()
-        && resource.data.userId == request.auth.uid;
+        && (
+          (resource == null && isOwnStatusDocId(statusId))
+          || (resource != null && resource.data.userId == request.auth.uid)
+        );
 
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
@@ -136,10 +178,12 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.videoId == resource.data.videoId
-        && request.resource.data.status in ["pending", "partially_watched", "watched"];
+        && request.resource.data.status in ["pending", "partially_watched", "watched"]
+        && (
+          resource.data.status != "watched"
+          || request.resource.data.status == "watched"
+        );
 
-      // Associated status records are deleted through
-      // the password-protected server API.
       allow delete: if false;
     }
 
@@ -147,9 +191,9 @@ service cloud.firestore {
     // MIND ROADMAPS
     // =====================================================
     match /roadmaps/{roadmapId} {
-      // Owner can read all their own roadmaps.
-      // Connections can only read public roadmaps.
+      // No resource==null oracle — creates use new ids; copies don't pre-get destination.
       allow read: if isSignedIn()
+        && resource != null
         && (
           resource.data.ownerId == request.auth.uid
           || (
@@ -171,23 +215,16 @@ service cloud.firestore {
         && request.resource.data.steps is list
         && request.resource.data.visibility in ["public", "private"];
 
-      // Roadmaps are deleted through the password-protected
-      // server API.
       allow delete: if false;
     }
 
     // =====================================================
     // ADMIN-ONLY DELETION SECURITY
     // =====================================================
-    // Password and security-answer hashes must never be
-    // accessible through the browser Firebase SDK.
     match /deletionCredentials/{userId} {
       allow read, write: if false;
     }
 
-    // =====================================================
-    // DENY UNKNOWN COLLECTIONS
-    // =====================================================
     match /{document=**} {
       allow read, write: if false;
     }

@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Library,
-  Plus,
   LogOut,
   ChevronDown,
   UsersRound,
@@ -23,8 +22,7 @@ import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/firebase";
 import { invalidateCache } from "@/lib/data-cache";
-import { getUserProfile } from "@/lib/users";
-import { onAuthStateChanged } from "firebase/auth";
+import { clearSignedIn, getCachedUserProfile, watchAuth } from "@/lib/auth";
 
 function ArigatoIcon({ className }: { className?: string }) {
   return (
@@ -40,16 +38,21 @@ function ArigatoIcon({ className }: { className?: string }) {
 const desktopNavLinks = [
   { href: "/dashboard", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
   { href: "/videos", label: "Collection", shortLabel: "Collection", icon: Library },
-  { href: "/guild", label: "Guild Videos", shortLabel: "Guild", icon: UsersRound },
+  { href: "/guild", label: "Guild", shortLabel: "Guild", icon: UsersRound },
   { href: "/roadmaps", label: "Mind Roadmaps", shortLabel: "Roadmaps", icon: Map },
-  { href: "/videos/add", label: "Add Video", shortLabel: "Add", icon: Plus },
   { href: "/explore", label: "Arigato Labs", shortLabel: "Labs", icon: ArigatoIcon },
 ];
 
 const mobileNavLinks = desktopNavLinks.filter(({ href }) => href !== "/explore");
 
 function isPathActive(activePath: string, href: string) {
-  return activePath === href || (href === "/roadmaps" && activePath.startsWith("/roadmaps/"));
+  if (href === "/roadmaps") {
+    return activePath === "/roadmaps" || activePath === "/roadmaps/connections" || activePath.startsWith("/roadmaps/");
+  }
+  if (href === "/guild") {
+    return activePath === "/guild" || activePath.startsWith("/guild/");
+  }
+  return activePath === href;
 }
 
 export default function Navbar() {
@@ -62,33 +65,30 @@ export default function Navbar() {
   useEffect(() => {
     const syncPath = () => setActivePath(window.location.pathname);
     syncPath();
-    // Since this component is persisted across Astro page transitions
-    // (transition:persist), it won't remount on navigation — listen for
-    // Astro's page-load event to keep the active link in sync (covers
-    // back/forward navigation and links outside this component).
-    document.addEventListener("astro:page-load", syncPath);
-    return () => document.removeEventListener("astro:page-load", syncPath);
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (!u) {
+    return watchAuth({
+      requireUsername: false,
+      onSignedOut: () => {
+        setUser(null);
         setUsername("");
-        return;
-      }
-      try {
-        const profile = await getUserProfile(u.uid);
-        setUsername(profile?.username || "");
-      } catch {
-        setUsername("");
-      }
+      },
+      onReady: async (u) => {
+        setUser(u);
+        try {
+          const profile = await getCachedUserProfile(u.uid);
+          setUsername(profile?.username || "");
+        } catch {
+          setUsername("");
+        }
+      },
     });
-    return () => unsubscribe();
   }, []);
 
   const handleSignOut = async () => {
     try {
+      clearSignedIn();
       await auth.signOut();
       invalidateCache();
       window.location.href = "/";
@@ -209,15 +209,11 @@ export function BottomNav() {
   useEffect(() => {
     const syncPath = () => setActivePath(window.location.pathname);
     syncPath();
-    // Persisted across page transitions, so listen for Astro's page-load
-    // event to keep the active tab in sync on every navigation.
-    document.addEventListener("astro:page-load", syncPath);
-    return () => document.removeEventListener("astro:page-load", syncPath);
   }, []);
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 h-16 bg-white border-t border-border elevation-1">
-      <div className="h-full grid grid-cols-5">
+      <div className="h-full grid grid-cols-4">
         {mobileNavLinks.map(({ href, shortLabel, icon: Icon }) => {
           const isActive = isPathActive(activePath, href);
           return (
