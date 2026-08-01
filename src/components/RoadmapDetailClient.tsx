@@ -36,6 +36,7 @@ import {
   type RoadmapStepStatus,
 } from "@/lib/roadmaps";
 import RoadmapStepList from "@/components/RoadmapStepList";
+import RoadmapDownloadMenu from "@/components/RoadmapDownloadMenu";
 import DeletePasswordDialog from "@/components/DeletePasswordDialog";
 import SecurityAnswerDialog from "@/components/SecurityAnswerDialog";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
   const [user, setUser] = useState<User | null>(null);
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
   const [ownerName, setOwnerName] = useState("unknown");
+  const [ownerFullName, setOwnerFullName] = useState("");
   const [state, setState] = useState<DetailState>("loading");
   const [updatingStepId, setUpdatingStepId] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
@@ -119,6 +121,7 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
         if (!active) return;
         const owner = ownerSnapshot.data();
         setOwnerName(owner?.username || owner?.name || "unknown");
+        setOwnerFullName(typeof owner?.name === "string" ? owner.name.trim() : "");
         setRoadmap(loadedRoadmap);
         setState("ready");
       } catch (error) {
@@ -470,7 +473,7 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
       </section>
 
       {!reorderMode && (
-      <section className="sticky bottom-20 z-10 rounded-lg border border-border bg-white p-3 shadow-lg lg:static lg:shadow-none" aria-label="Roadmap actions">
+      <section className="sticky bottom-20 z-10 space-y-2 rounded-lg border border-border bg-white p-3 shadow-lg lg:static lg:shadow-none" aria-label="Roadmap actions">
         {isOwner ? (
           <div className="grid gap-2 sm:grid-cols-2">
             <Button type="button" size="lg" onClick={() => setEditDialogOpen(true)}>
@@ -494,6 +497,12 @@ export default function RoadmapDetailClient({ roadmapId }: RoadmapDetailClientPr
             {copying ? "Copying roadmap…" : "Copy to My Roadmaps"}
           </Button>
         )}
+        <RoadmapDownloadMenu
+          roadmap={roadmap}
+          ownerName={ownerFullName}
+          ownerUsername={ownerName}
+          className="w-full"
+        />
       </section>
       )}
 
