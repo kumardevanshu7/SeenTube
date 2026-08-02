@@ -66,6 +66,9 @@ interface VideoCardProps {
    * Hides secondary info (description, tags, friend status) below the `sm`
    * breakpoint. Above `sm` (tablet/desktop) full details always show. */
   compact?: boolean;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (videoId: string) => void;
 }
 
 const statusOptions: Array<{
@@ -126,6 +129,9 @@ export default function VideoCard({
   onStatusChange,
   onDelete,
   compact = false,
+  selectionMode = false,
+  selected = false,
+  onToggleSelect,
 }: VideoCardProps) {
   const [myStatus, setMyStatus] = useState<VideoStatusEnum>(video.myStatus);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -226,7 +232,13 @@ export default function VideoCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10, scale: 0.95 }}
       transition={{ delay: index * 0.05, duration: 0.35, ease: "easeOut" }}
-      className={cn("card flex h-full flex-col rounded-lg overflow-hidden group", `card-tint-${myStatus}`)}
+      onClick={selectionMode ? () => onToggleSelect?.(video.id) : undefined}
+      className={cn(
+        "card flex h-full flex-col rounded-lg overflow-hidden group",
+        `card-tint-${myStatus}`,
+        selectionMode && "cursor-pointer",
+        selectionMode && selected && "ring-2 ring-primary border-primary",
+      )}
       layout
     >
       {/* Thumbnail */}
@@ -241,16 +253,33 @@ export default function VideoCard({
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-        {/* Open in YouTube button */}
-        <a
-          href={youtubeUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="absolute top-2 right-2 p-2 rounded-full bg-white text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 elevation-1 hover:bg-secondary"
-          title="Watch on YouTube"
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
+        {selectionMode ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleSelect?.(video.id);
+            }}
+            aria-pressed={selected}
+            aria-label={selected ? `Deselect ${video.title}` : `Select ${video.title}`}
+            className={cn(
+              "absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-md border-2 bg-white/95 shadow-sm transition-colors",
+              selected ? "border-primary bg-primary text-white" : "border-border text-transparent",
+            )}
+          >
+            <CheckCircle2 className="h-4 w-4" />
+          </button>
+        ) : (
+          <a
+            href={youtubeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-2 right-2 p-2 rounded-full bg-white text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 elevation-1 hover:bg-secondary"
+            title="Watch on YouTube"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        )}
 
         {/* Status badge overlay */}
         <div className={cn("absolute left-2 bottom-2", compact && "left-1.5 bottom-1.5")}>
@@ -293,6 +322,7 @@ export default function VideoCard({
           </div>
 
           {/* Context Menu */}
+          {!selectionMode && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -302,6 +332,7 @@ export default function VideoCard({
                 )}
                 disabled={isUpdating}
                 aria-label="Video options"
+                onClick={(event) => event.stopPropagation()}
               >
                 <MoreVertical className={cn(compact ? "w-3.5 h-3.5 sm:w-4 sm:h-4" : "w-4 h-4")} />
               </button>
@@ -350,6 +381,7 @@ export default function VideoCard({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
         </div>
 
         {/* Description — always reserve height so labels align across cards */}

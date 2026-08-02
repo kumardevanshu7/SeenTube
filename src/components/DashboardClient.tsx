@@ -9,12 +9,22 @@ import {
   Youtube,
 } from "lucide-react";
 import DashboardStats from "./DashboardStats";
-import { formatRelativeDate } from "@/lib/utils";
-import type { Video, VideoStatus } from "@/lib/constants";
+import { cn, formatRelativeDate } from "@/lib/utils";
+import type { Video, VideoStatus, VideoStatusEnum } from "@/lib/constants";
 import { getCached, setCached } from "@/lib/data-cache";
 import { redirectNeedsUsername, redirectSignedOut, watchAuth } from "@/lib/auth";
 
 const cacheKey = (uid: string) => `dashboard:data:${uid}`;
+const GRID_COLS = [3, 4, 5, 6, 7] as const;
+type GridCols = (typeof GRID_COLS)[number];
+
+const gridColClass: Record<GridCols, string> = {
+  3: "grid-cols-2 sm:grid-cols-3",
+  4: "grid-cols-2 sm:grid-cols-3 md:grid-cols-4",
+  5: "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5",
+  6: "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6",
+  7: "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7",
+};
 
 interface DashboardCache {
   videos: Video[];
@@ -60,12 +70,35 @@ const quickTasks = [
   },
 ] as const;
 
+const statusLabel = (status: VideoStatusEnum | "pending") => {
+  if (status === "watched") return "Watched";
+  if (status === "partially_watched") return "Partial";
+  return "Pending";
+};
+
+const statusClass = (status: VideoStatusEnum | "pending") => {
+  if (status === "watched") return "badge-watched";
+  if (status === "partially_watched") return "badge-partially";
+  return "badge-pending";
+};
+
 export default function DashboardClient() {
   const [user, setUser] = useState<any>(null);
   const [videos, setVideos] = useState<Video[]>([]);
   const [statuses, setStatuses] = useState<VideoStatus[]>([]);
   const [friend, setFriend] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [gridCols, setGridCols] = useState<GridCols>(4);
+
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("dashboard:gridCols"));
+    if (GRID_COLS.includes(saved as GridCols)) setGridCols(saved as GridCols);
+  }, []);
+
+  const changeGridCols = (cols: GridCols) => {
+    setGridCols(cols);
+    localStorage.setItem("dashboard:gridCols", String(cols));
+  };
 
   useEffect(() => {
     return watchAuth({
@@ -155,7 +188,7 @@ export default function DashboardClient() {
   const partiallyWatched = myStatuses.filter((s) => s.status === "partially_watched").length;
   const pending = total - watched - partiallyWatched;
 
-  const recentVideos = videos.slice(0, 5).map((v) => {
+  const recentVideos = videos.slice(0, Math.max(gridCols * 2, 8)).map((v) => {
     const myStatus = myStatuses.find((s) => s.videoId === v.id)?.status ?? "pending";
     const friendStatus = friend
       ? statuses.find((s) => s.videoId === v.id && s.userId === friend.id)?.status
@@ -220,63 +253,78 @@ export default function DashboardClient() {
 
       {recentVideos.length > 0 && (
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-xl font-bold">Recently Added</h2>
-            <a href="/videos" className="text-sm text-primary hover:underline flex items-center gap-1">
-              View all
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
-              </svg>
-            </a>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="font-display text-xl font-bold">Recently Added</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Square video cards from your collection</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 rounded-lg border border-border p-1" role="group" aria-label="Dashboard grid columns">
+                {GRID_COLS.map((cols) => (
+                  <button
+                    key={cols}
+                    type="button"
+                    onClick={() => changeGridCols(cols)}
+                    className={cn(
+                      "h-8 min-w-8 rounded-md px-2 text-xs font-semibold transition-colors",
+                      gridCols === cols
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                    )}
+                    aria-pressed={gridCols === cols}
+                  >
+                    {cols}
+                  </button>
+                ))}
+              </div>
+              <a href="/videos" className="text-sm text-primary hover:underline flex items-center gap-1">
+                View all
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                </svg>
+              </a>
+            </div>
           </div>
 
-          <div className="space-y-3">
+          <div className={cn("grid gap-3 sm:gap-4", gridColClass[gridCols])}>
             {recentVideos.map((v: any, i) => (
-              <div
+              <a
                 key={v.id}
-                className="card rounded-lg p-4 flex items-center gap-4 animate-fade-in"
-                style={{ animationDelay: `${i * 60}ms` }}
+                href={`https://www.youtube.com/watch?v=${encodeURIComponent(v.videoId)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="card group relative aspect-square overflow-hidden rounded-lg border border-border animate-fade-in"
+                style={{ animationDelay: `${i * 40}ms` }}
+                aria-label={`Watch ${v.title} on YouTube`}
               >
-                <div className="relative flex-shrink-0 w-20 h-14 rounded-lg overflow-hidden bg-muted">
-                  <img
-                    src={v.thumbnail}
-                    alt={v.title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      // fallback to hqdefault if maxresdefault 404s
-                      (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`;
-                    }}
-                  />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">{v.title}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-muted-foreground">{v.category}</span>
-                    <span className="text-muted-foreground/40">·</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatRelativeDate(
-                        typeof v.createdAt === "number"
-                          ? v.createdAt
-                          : new Date(v.createdAt ?? 0).getTime()
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex-shrink-0">
-                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                    v.myStatus === "watched" ? "badge-watched" :
-                    v.myStatus === "partially_watched" ? "badge-partially" :
-                    "badge-pending"
-                  }`}>
-                    {v.myStatus === "watched" ? "Watched" :
-                     v.myStatus === "partially_watched" ? "Partial" :
-                     "Pending"}
+                <img
+                  src={v.thumbnail}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  loading="lazy"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`;
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 space-y-1.5 p-2.5 sm:p-3">
+                  <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold sm:text-xs", statusClass(v.myStatus))}>
+                    {statusLabel(v.myStatus)}
                   </span>
+                  <p className="line-clamp-2 text-xs font-semibold leading-snug text-white sm:text-sm">
+                    {v.title}
+                  </p>
+                  <p className="truncate text-[10px] text-white/70 sm:text-xs">
+                    {v.category}
+                    <span className="mx-1 opacity-50">·</span>
+                    {formatRelativeDate(
+                      typeof v.createdAt === "number"
+                        ? v.createdAt
+                        : new Date(v.createdAt ?? 0).getTime(),
+                    )}
+                  </p>
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         </section>

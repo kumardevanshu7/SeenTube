@@ -58,8 +58,18 @@ export async function deleteProtectedResource(
   resourceId: string,
   answer: string,
 ) {
+  await deleteProtectedResources(resourceType, [resourceId], answer);
+}
+
+export async function deleteProtectedResources(
+  resourceType: ProtectedResourceType,
+  resourceIds: string[],
+  answer: string,
+) {
   const user = auth.currentUser;
   if (!user) throw new Error("Please sign in again before deleting.");
+  const ids = resourceIds.filter((id) => typeof id === "string" && id && !id.includes("/"));
+  if (ids.length === 0) throw new Error("Nothing selected to delete.");
 
   const token = await user.getIdToken();
   const response = await fetch("/api/delete-resource", {
@@ -68,10 +78,16 @@ export async function deleteProtectedResource(
       "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ resourceType, resourceId, answer }),
+    body: JSON.stringify({
+      resourceType,
+      resourceId: ids[0],
+      resourceIds: ids,
+      answer,
+    }),
   });
-  const result = await response.json().catch(() => ({})) as DeleteResponse;
+  const result = await response.json().catch(() => ({})) as DeleteResponse & { deletedIds?: string[] };
   if (!response.ok) {
     throw new Error(result.error || "Deletion could not be completed.");
   }
+  return result.deletedIds || ids;
 }
