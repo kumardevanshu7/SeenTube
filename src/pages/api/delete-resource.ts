@@ -4,6 +4,7 @@ import {
   DeletionSecurityError,
   FirebaseAdminConfigurationError,
   getAdminDb,
+  isTrustedBrowserOrigin,
   verifyDeletionAnswer,
 } from "@/lib/server/deletion-security";
 
@@ -15,8 +16,7 @@ const json = (status: number, body: Record<string, unknown>) => new Response(
 );
 
 export const POST: APIRoute = async ({ request }) => {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return json(403, { error: "Request denied." });
+  if (!isTrustedBrowserOrigin(request)) return json(403, { error: "Request denied." });
   if (!request.headers.get("content-type")?.includes("application/json")) {
     return json(415, { error: "JSON request required." });
   }

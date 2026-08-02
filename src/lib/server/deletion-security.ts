@@ -66,6 +66,58 @@ export async function authenticateRequest(request: Request) {
   return getAuth(getAdminApp()).verifyIdToken(authorization.slice(7), true);
 }
 
+/**
+ * CSRF guard that works behind Vercel/proxies.
+ * Browsers send Origin on POSTs; comparing only to `request.url` breaks when
+ * the runtime URL host differs from the public Host / x-forwarded-host.
+ */
+export function isTrustedBrowserOrigin(request: Request) {
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host.toLowerCase();
+  } catch {
+    return false;
+  }
+
+  const candidates = new Set<string>();
+  const push = (value: string | null | undefined) => {
+    if (!value) return;
+    const host = value.split(",")[0]?.trim().toLowerCase();
+    if (host) candidates.add(host);
+  };
+
+  push(request.headers.get("x-forwarded-host"));
+  push(request.headers.get("host"));
+  try {
+    push(new URL(request.url).host);
+  } catch {
+    // ignore malformed request URL
+  }
+
+  const siteUrl = import.meta.env.PUBLIC_SITE_URL || import.meta.env.SITE;
+  if (typeof siteUrl === "string" && siteUrl) {
+    try {
+      push(new URL(siteUrl).host);
+    } catch {
+      // ignore
+    }
+  }
+
+  if (candidates.has(originHost)) return true;
+
+  // Treat www.example.com and example.com as the same site.
+  const stripWww = (host: string) => host.replace(/^www\./, "");
+  const originBare = stripWww(originHost);
+  for (const candidate of candidates) {
+    if (stripWww(candidate) === originBare) return true;
+  }
+  return false;
+}
+
+
 const normalizeAnswer = (value: string) => value.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
 
 const deriveHash = async (value: string, salt: string) =>

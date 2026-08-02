@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, getDocs, where } from "firebase/firestore";
+import {
+  Library,
+  Map,
+  Plus,
+  UsersRound,
+  Youtube,
+} from "lucide-react";
 import DashboardStats from "./DashboardStats";
 import { formatRelativeDate } from "@/lib/utils";
 import type { Video, VideoStatus } from "@/lib/constants";
@@ -14,6 +21,44 @@ interface DashboardCache {
   statuses: VideoStatus[];
   friend: any;
 }
+
+const quickTasks = [
+  {
+    href: "/videos/add",
+    label: "Add Video",
+    hint: "Paste a YouTube link",
+    icon: Plus,
+    external: false,
+  },
+  {
+    href: "/videos",
+    label: "Collection",
+    hint: "Browse your library",
+    icon: Library,
+    external: false,
+  },
+  {
+    href: "https://www.youtube.com",
+    label: "YouTube",
+    hint: "Open YouTube",
+    icon: Youtube,
+    external: true,
+  },
+  {
+    href: "/guild",
+    label: "Guild",
+    hint: "Connections & shares",
+    icon: UsersRound,
+    external: false,
+  },
+  {
+    href: "/roadmaps",
+    label: "Roadmaps",
+    hint: "Learning paths",
+    icon: Map,
+    external: false,
+  },
+] as const;
 
 export default function DashboardClient() {
   const [user, setUser] = useState<any>(null);
@@ -145,6 +190,33 @@ export default function DashboardClient() {
       </div>
 
       <DashboardStats stats={stats} />
+
+      <section className="space-y-3" aria-labelledby="quick-tasks-title">
+        <h2 id="quick-tasks-title" className="font-display text-xl font-bold">Quick tasks</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {quickTasks.map((task) => {
+            const Icon = task.icon;
+            return (
+              <a
+                key={task.label}
+                href={task.href}
+                {...(task.external
+                  ? { target: "_blank", rel: "noopener noreferrer" }
+                  : {})}
+                className="card flex items-center gap-3 rounded-lg border border-border p-3.5 transition-colors hover:border-primary/40 hover:bg-secondary/60"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#fff0f3] text-primary">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-foreground">{task.label}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{task.hint}</span>
+                </span>
+              </a>
+            );
+          })}
+        </div>
+      </section>
 
       {recentVideos.length > 0 && (
         <section className="space-y-4">

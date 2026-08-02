@@ -6,6 +6,7 @@ import {
   FirebaseAdminConfigurationError,
   getDeletionSecurity,
   isFirebaseAdminConfigured,
+  isTrustedBrowserOrigin,
   setupDeletionSecurity,
   verifyDeletionAnswer,
 } from "@/lib/server/deletion-security";
@@ -55,8 +56,7 @@ export const GET: APIRoute = async ({ request }) => {
 };
 
 export const POST: APIRoute = async ({ request }) => {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return json(403, { error: "Request denied." });
+  if (!isTrustedBrowserOrigin(request)) return json(403, { error: "Request denied." });
   if (!request.headers.get("content-type")?.includes("application/json")) return json(415, { error: "JSON request required." });
   if (Number(request.headers.get("content-length") || 0) > 4096) return json(413, { error: "Request is too large." });
 
