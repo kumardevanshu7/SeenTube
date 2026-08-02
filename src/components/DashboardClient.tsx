@@ -256,7 +256,7 @@ export default function DashboardClient() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="font-display text-xl font-bold">Recently Added</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Square video cards from your collection</p>
+              <p className="mt-1 text-sm text-muted-foreground">Video cards from your collection</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1 rounded-lg border border-border p-1" role="group" aria-label="Dashboard grid columns">
@@ -293,7 +293,7 @@ export default function DashboardClient() {
                 href={`https://www.youtube.com/watch?v=${encodeURIComponent(v.videoId)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="card group relative aspect-square overflow-hidden rounded-lg border border-border animate-fade-in"
+                className="card group relative aspect-video overflow-hidden rounded-lg border border-border animate-fade-in"
                 style={{ animationDelay: `${i * 40}ms` }}
                 aria-label={`Watch ${v.title} on YouTube`}
               >
