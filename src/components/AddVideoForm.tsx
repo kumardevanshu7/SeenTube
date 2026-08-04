@@ -70,6 +70,7 @@ export default function AddVideoForm() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [categories, setCategories] = useState<string[]>([...CATEGORIES]);
   const [editCategoriesOpen, setEditCategoriesOpen] = useState(false);
+  const [savedTags, setSavedTags] = useState<string[]>([]);
 
   // Auth check
   const [authChecked, setAuthChecked] = useState(false);
@@ -84,11 +85,65 @@ export default function AddVideoForm() {
         } catch {
           setCategories([...CATEGORIES]);
         }
+
+        try {
+          const snapshot = await getDocs(query(
+            collection(db, "videos"),
+            where("addedBy", "==", u.uid),
+          ));
+          const seen = new Map<string, string>();
+          snapshot.docs.forEach((videoDoc) => {
+            const tags = videoDoc.data().tags;
+            if (!Array.isArray(tags)) return;
+            tags.forEach((tag) => {
+              if (typeof tag !== "string") return;
+              const cleaned = tag.trim().replace(/\s+/g, " ");
+              if (!cleaned) return;
+              const key = cleaned.toLowerCase();
+              if (!seen.has(key)) seen.set(key, cleaned);
+            });
+          });
+          setSavedTags(
+            Array.from(seen.values()).sort((a, b) => a.localeCompare(b)),
+          );
+        } catch {
+          setSavedTags([]);
+        }
+
         setAuthChecked(true);
       },
     });
   }, []);
 
+  const selectedTags = [tag1, tag2]
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+
+  const toggleSavedTag = (tag: string) => {
+    const key = tag.toLowerCase();
+    const inSlot1 = tag1.trim().toLowerCase() === key;
+    const inSlot2 = tag2.trim().toLowerCase() === key;
+
+    if (inSlot1) {
+      setTag1(tag2);
+      setTag2("");
+      return;
+    }
+    if (inSlot2) {
+      setTag2("");
+      return;
+    }
+    if (!tag1.trim()) {
+      setTag1(tag);
+      return;
+    }
+    if (!tag2.trim()) {
+      setTag2(tag);
+      return;
+    }
+    // Both slots full — replace the second tag.
+    setTag2(tag);
+  };
   // Auto-fetch metadata and check whether this account already added the video.
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -444,6 +499,38 @@ export default function AddVideoForm() {
                   />
                 </div>
               </div>
+
+              {savedTags.length > 0 && (
+                <div className="pt-1">
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Your tags — tap to fill
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {savedTags.map((tag) => {
+                      const active = selectedTags.some(
+                        (selected) => selected.toLowerCase() === tag.toLowerCase(),
+                      );
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleSavedTag(tag)}
+                          aria-pressed={active}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                            active
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-secondary text-foreground hover:border-primary/40",
+                          )}
+                        >
+                          <Tag className="h-3 w-3" />
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Description */}
