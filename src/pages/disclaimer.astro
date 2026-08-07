@@ -1,0 +1,53 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import LegalPageShell from "@/components/LegalPageShell.astro";
+---
+
+<Layout
+  title="Disclaimer"
+  description="SeenTube and Arigato Labs materials are provided as is."
+>
+  <LegalPageShell
+    title="Disclaimer"
+    lead="Limits of liability for SeenTube and Arigato Labs."
+    updated="August 2026"
+  >
+    <section class="space-y-3">
+      <h2>As is</h2>
+      <p>
+        <strong>SeenTube</strong> and Arigato Labs materials are provided <strong>“as is”</strong>
+        without warranties of any kind, express or implied — including merchantability,
+        fitness for a particular purpose, and non-infringement.
+      </p>
+    </section>
+
+    <section class="space-y-3">
+      <h2>Limitation of liability</h2>
+      <p>
+        To the maximum extent allowed by law, Arigato Labs and Kumar Devanshu are
+        <strong>not liable</strong> for loss of data, profits, goodwill, or any damages
+        arising from use of — or inability to use — SeenTube.
+      </p>
+    </section>
+
+    <section class="space-y-3">
+      <h2>Not professional advice</h2>
+      <p>
+        Roadmaps, collections, and organization tools are productivity helpers.
+        They are not legal, medical, financial, or professional advice. Verify anything important yourself.
+      </p>
+    </section>
+
+    <section class="space-y-3">
+      <h2>Third-party services</h2>
+      <p>
+        Google, Firebase, YouTube, Vercel, and other providers have their own terms and availability.
+        Arigato Labs is not responsible for outages or policy changes on those platforms.
+      </p>
+    </section>
+
+    <p class="!text-foreground pt-2 text-sm font-medium">
+      Copyright © 2026 Arigato Labs. All Rights Reserved.
+    </p>
+  </LegalPageShell>
+</Layout>

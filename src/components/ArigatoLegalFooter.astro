@@ -1,0 +1,29 @@
+---
+const links = [
+  { href: "/about", label: "About" },
+  { href: "/privacy", label: "Privacy" },
+  { href: "/terms", label: "Terms" },
+  { href: "/disclaimer", label: "Disclaimer" },
+  { href: "/contact", label: "Contact" },
+] as const;
+---
+
+<footer class="border-t border-border">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:px-6">
+    <nav class="flex flex-wrap items-center gap-x-3 gap-y-2" aria-label="Legal">
+      {links.map((link, index) => (
+        <>
+          {index > 0 && <span class="text-border" aria-hidden="true">·</span>}
+          <a href={link.href} class="font-medium text-foreground hover:text-primary">{link.label}</a>
+        </>
+      ))}
+    </nav>
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p>Copyright © 2026 Arigato Labs. All Rights Reserved.</p>
+      <a href="/explore" class="inline-flex items-center gap-2 font-medium text-foreground hover:text-primary">
+        <img src="/arigato-single-logo.png" alt="" class="h-[17px] w-[17px] object-contain" />
+        An Arigato Labs product
+      </a>
+    </div>
+  </div>
+</footer>

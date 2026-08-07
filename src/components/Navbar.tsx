@@ -40,7 +40,7 @@ const desktopNavLinks = [
   { href: "/videos", label: "Collection", shortLabel: "Collection", icon: Library },
   { href: "/guild", label: "Guild", shortLabel: "Guild", icon: UsersRound },
   { href: "/roadmaps", label: "Mind Roadmaps", shortLabel: "Roadmaps", icon: Map },
-  { href: "/explore", label: "Arigato Labs", shortLabel: "Labs", icon: ArigatoIcon },
+  { href: "/explore", label: "Explore Arigato Labs", shortLabel: "Labs", icon: ArigatoIcon },
 ];
 
 const mobileNavLinks = desktopNavLinks.filter(({ href }) => href !== "/explore");

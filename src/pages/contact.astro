@@ -1,0 +1,28 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import ContactForm from "@/components/ContactForm";
+---
+
+<Layout
+  title="Contact Arigato Labs"
+  description="Send a message to Arigato Labs about SeenTube."
+>
+  <div class="mx-auto max-w-2xl space-y-8 px-4 py-12 sm:px-6 sm:py-16">
+    <header class="animate-fade-in">
+      <p class="text-xs font-bold uppercase tracking-[0.2em] text-primary">Arigato Labs</p>
+      <h1 class="mt-3 text-3xl font-bold tracking-[-0.04em] sm:text-5xl">Contact Arigato Labs</h1>
+      <p class="mt-4 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
+        Questions about <strong class="text-foreground">SeenTube</strong> or Arigato Labs?
+        Send a message — it goes to the founder.
+      </p>
+      <p class="mt-3 text-sm text-muted-foreground">
+        Public email:
+        <a class="font-semibold text-primary hover:underline" href="mailto:kumardevanshu3001@gmail.com">
+          kumardevanshu3001@gmail.com
+        </a>
+      </p>
+    </header>
+
+    <ContactForm client:load />
+  </div>
+</Layout>

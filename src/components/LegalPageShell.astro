@@ -1,0 +1,63 @@
+---
+interface Props {
+  eyebrow?: string;
+  title: string;
+  lead?: string;
+  updated?: string;
+}
+
+const {
+  eyebrow = "Arigato Labs",
+  title,
+  lead,
+  updated,
+} = Astro.props;
+---
+
+<article class="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
+  <header class="animate-fade-in">
+    <p class="text-xs font-bold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
+    <h1 class="mt-3 text-3xl font-bold tracking-[-0.04em] sm:text-5xl">{title}</h1>
+    {lead && <p class="mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">{lead}</p>}
+    {updated && <p class="mt-3 text-xs text-muted-foreground">Last updated: {updated}</p>}
+  </header>
+  <div class="legal-prose mt-10 space-y-8 text-sm leading-7 text-foreground sm:text-base sm:leading-8">
+    <slot />
+  </div>
+</article>
+
+<style>
+  .legal-prose :global(h2) {
+    margin-top: 0.25rem;
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  @media (min-width: 640px) {
+    .legal-prose :global(h2) {
+      font-size: 1.25rem;
+    }
+  }
+  .legal-prose :global(p),
+  .legal-prose :global(ul) {
+    color: hsl(var(--muted-foreground));
+  }
+  .legal-prose :global(ul) {
+    list-style: disc;
+    padding-left: 1.25rem;
+  }
+  .legal-prose :global(li + li) {
+    margin-top: 0.35rem;
+  }
+  .legal-prose :global(a) {
+    color: hsl(var(--primary));
+    font-weight: 600;
+  }
+  .legal-prose :global(a:hover) {
+    text-decoration: underline;
+  }
+  .legal-prose :global(strong) {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+  }
+</style>

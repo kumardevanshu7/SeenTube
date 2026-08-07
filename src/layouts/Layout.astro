@@ -1,12 +1,14 @@
 ---
 import "@/styles/globals.css";
 import Navbar, { BottomNav } from "@/components/Navbar";
+import ArigatoLegalFooter from "@/components/ArigatoLegalFooter.astro";
 import { Toaster } from "sonner";
 
 interface Props {
   title?: string;
   description?: string;
   showNav?: boolean;
+  showSiteFooter?: boolean;
   user?: {
     id: string;
     name: string;
@@ -19,9 +21,11 @@ const {
   title = "SeenTube",
   description = "Your shared YouTube collection",
   showNav = true,
+  showSiteFooter,
   user = null,
 } = Astro.props;
 const isProduction = import.meta.env.PROD;
+const renderSiteFooter = showSiteFooter ?? showNav;
 ---
 
 <!doctype html>
@@ -73,6 +77,13 @@ const isProduction = import.meta.env.PROD;
     <main class={showNav ? "pt-20 pb-20 lg:pb-0" : ""}>
       <slot />
     </main>
+    {
+      renderSiteFooter && (
+        <div class={showNav ? "pb-20 lg:pb-0" : ""}>
+          <ArigatoLegalFooter />
+        </div>
+      )
+    }
     {
       showNav && (
         <BottomNav client:load />

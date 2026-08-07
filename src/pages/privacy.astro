@@ -1,0 +1,97 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import LegalPageShell from "@/components/LegalPageShell.astro";
+---
+
+<Layout
+  title="Privacy Policy"
+  description="How SeenTube and Arigato Labs collect, use, and protect your data."
+>
+  <LegalPageShell
+    title="Privacy Policy"
+    lead="Plain-language summary of what SeenTube stores and why."
+    updated="August 2026"
+  >
+    <section class="space-y-3">
+      <h2>1. Who we are</h2>
+      <p>
+        <strong>SeenTube</strong> is a product of <strong>Arigato Labs</strong>, founded by Kumar Devanshu.
+        Contact: <a href="mailto:kumardevanshu3001@gmail.com">kumardevanshu3001@gmail.com</a>.
+      </p>
+    </section>
+
+    <section class="space-y-3">
+      <h2>2. What we collect</h2>
+      <ul>
+        <li><strong>Account:</strong> name, email, and profile photo from Google sign-in (Firebase Authentication).</li>
+        <li><strong>Profile:</strong> your chosen username and optional category preferences.</li>
+        <li><strong>App content you create:</strong> saved videos, tags, descriptions, watch statuses, roadmaps, and connection requests.</li>
+        <li><strong>Security settings:</strong> your One Password question in plain text and a salted hash of your answer (never the plain answer) for protected deletes.</li>
+        <li><strong>Local device data:</strong> short-lived caches and signed-in flags in browser storage to keep the app fast across page loads.</li>
+        <li><strong>Technical:</strong> standard hosting/request logs from our host (Vercel) and Firebase may include IP and basic device metadata as part of normal service operation.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-3">
+      <h2>3. How we use data</h2>
+      <ul>
+        <li>Provide SeenTube features: collections, Guild sharing, roadmaps, and exports.</li>
+        <li>Keep you signed in and sync your data across devices.</li>
+        <li>Protect destructive actions with One Password verification.</li>
+        <li>Improve reliability and fix abuse or security issues.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-3">
+      <h2>4. Third parties</h2>
+      <p>We use these services to run SeenTube. We do <strong>not</strong> sell your personal data.</p>
+      <ul>
+        <li><strong>Google / Firebase</strong> — authentication and Firestore database.</li>
+        <li><strong>Vercel</strong> — app hosting and serverless API routes.</li>
+        <li><strong>YouTube</strong> — public video metadata (title/thumbnail) when you paste a link; we do not use a YouTube Data API key for browsing your private watch history.</li>
+        <li><strong>Web3Forms</strong> (if configured) — delivers Contact form messages to the founder email.</li>
+      </ul>
+      <p>Each provider processes data under their own policies.</p>
+    </section>
+
+    <section class="space-y-3">
+      <h2>5. Storage &amp; retention</h2>
+      <p>
+        Account and app content live in Firebase (cloud). Browser caches are temporary and local.
+        You can remove videos and roadmaps you own (with One Password). Connection and username
+        data remain while your account is active. For a full account wipe request, email
+        <a href="mailto:kumardevanshu3001@gmail.com">kumardevanshu3001@gmail.com</a>.
+      </p>
+    </section>
+
+    <section class="space-y-3">
+      <h2>6. Security</h2>
+      <p>
+        We use signed-in access, Firestore security rules, server-verified tokens for sensitive APIs,
+        and hashed One Password answers. No system is perfect — please use a strong Google account
+        and a memorable but private security answer.
+      </p>
+    </section>
+
+    <section class="space-y-3">
+      <h2>7. Children</h2>
+      <p>SeenTube is not directed at children under 13. Do not create an account if you are under 13.</p>
+    </section>
+
+    <section class="space-y-3">
+      <h2>8. Changes</h2>
+      <p>
+        We may update this policy. Continued use of SeenTube after changes means you accept the updated version.
+        The “Last updated” date at the top will change when we revise it.
+      </p>
+    </section>
+
+    <section class="space-y-3">
+      <h2>9. Contact</h2>
+      <p>
+        Privacy questions: <a href="mailto:kumardevanshu3001@gmail.com">kumardevanshu3001@gmail.com</a>
+        or the <a href="/contact">Contact</a> page.
+      </p>
+    </section>
+  </LegalPageShell>
+</Layout>
